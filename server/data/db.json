@@ -1,0 +1,210 @@
+{
+  "users": [
+    {
+      "id": "user_alex",
+      "username": "alex123",
+      "name": "Alex",
+      "avatar": "🧒",
+      "pin": "1234",
+      "status": "offline",
+      "statusMessage": "¡Listo para jugar y chatear! 🎮",
+      "badge": "Explorador 🌟",
+      "createdAt": "2026-01-10T10:00:00Z",
+      "blockedUserIds": []
+    },
+    {
+      "id": "user_mateo",
+      "username": "mateo_pro",
+      "name": "Mateo",
+      "avatar": "🧑‍🚀",
+      "pin": "1234",
+      "status": "offline",
+      "statusMessage": "Viendo dibujos de astronautas 🚀",
+      "badge": "Astro-Fan 🛸",
+      "createdAt": "2026-01-12T14:30:00Z",
+      "blockedUserIds": []
+    },
+    {
+      "id": "user_sofia",
+      "username": "sofi_star",
+      "name": "Sofía",
+      "avatar": "👧",
+      "pin": "1234",
+      "status": "offline",
+      "statusMessage": "Haciendo la tarea de ciencias 📚",
+      "badge": "Científica 🔬",
+      "createdAt": "2026-01-15T09:20:00Z",
+      "blockedUserIds": []
+    },
+    {
+      "id": "user_lucas",
+      "username": "lucas_gamer",
+      "name": "Lucas",
+      "avatar": "👦",
+      "pin": "1234",
+      "status": "offline",
+      "statusMessage": "En una partida de bloques 🧱",
+      "badge": "Constructor 🏰",
+      "createdAt": "2026-02-01T11:00:00Z",
+      "blockedUserIds": []
+    },
+    {
+      "id": "user_ana",
+      "username": "ana_arte",
+      "name": "Ana",
+      "avatar": "🎨",
+      "pin": "1234",
+      "status": "offline",
+      "statusMessage": "Pintando un arcoíris 🌈",
+      "badge": "Artista 🖌️",
+      "createdAt": "2026-02-05T16:45:00Z",
+      "blockedUserIds": []
+    },
+    {
+      "id": "user_leo",
+      "username": "leo_dino",
+      "name": "Leo",
+      "avatar": "🦖",
+      "pin": "1234",
+      "status": "offline",
+      "statusMessage": "Leyendo sobre el T-Rex 🦕",
+      "badge": "Dino-Experto 🌿",
+      "createdAt": "2026-02-10T12:00:00Z",
+      "blockedUserIds": []
+    },
+    {
+      "id": "user_vale",
+      "username": "vale_music",
+      "name": "Valentina",
+      "avatar": "🎵",
+      "pin": "1234",
+      "status": "offline",
+      "statusMessage": "Practicando el piano 🎹",
+      "badge": "Melodía 🎶",
+      "createdAt": "2026-02-14T08:15:00Z",
+      "blockedUserIds": []
+    },
+    {
+      "id": "user_tomas",
+      "username": "tomy_soccer",
+      "name": "Tomás",
+      "avatar": "⚽",
+      "pin": "1234",
+      "status": "offline",
+      "statusMessage": "En el entrenamiento de fútbol ⚽",
+      "badge": "Goleador 🏆",
+      "createdAt": "2026-02-20T17:00:00Z",
+      "blockedUserIds": []
+    }
+  ],
+  "friendRequests": [
+    {
+      "id": "req_alex_mateo",
+      "senderId": "user_mateo",
+      "receiverId": "user_alex",
+      "status": "ACCEPTED",
+      "createdAt": "2026-02-22T10:00:00Z"
+    },
+    {
+      "id": "req_alex_sofia",
+      "senderId": "user_alex",
+      "receiverId": "user_sofia",
+      "status": "ACCEPTED",
+      "createdAt": "2026-02-23T11:30:00Z"
+    },
+    {
+      "id": "req_lucas_alex",
+      "senderId": "user_lucas",
+      "receiverId": "user_alex",
+      "status": "PENDING",
+      "createdAt": "2026-03-01T15:20:00Z"
+    },
+    {
+      "id": "req_alex_ana",
+      "senderId": "user_alex",
+      "receiverId": "user_ana",
+      "status": "PENDING",
+      "createdAt": "2026-03-02T09:10:00Z"
+    }
+  ],
+  "conversations": [
+    {
+      "id": "conv_alex_mateo",
+      "participantA": "user_alex",
+      "participantB": "user_mateo",
+      "createdAt": "2026-02-22T10:05:00Z"
+    },
+    {
+      "id": "conv_alex_sofia",
+      "participantA": "user_alex",
+      "participantB": "user_sofia",
+      "createdAt": "2026-02-23T11:35:00Z"
+    },
+    {
+      "id": "conv_epibot",
+      "participantA": "user_alex",
+      "participantB": "assistant_epibot",
+      "createdAt": "2026-01-10T10:00:00Z",
+      "isAiAssistant": true
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg_1",
+      "conversationId": "conv_alex_mateo",
+      "senderId": "user_mateo",
+      "content": "¡Hola Alex! 👋 ¿Viste el cohete que despegó ayer?",
+      "createdAt": "2026-03-02T10:15:00Z",
+      "status": "read"
+    },
+    {
+      "id": "msg_2",
+      "conversationId": "conv_alex_mateo",
+      "senderId": "user_alex",
+      "content": "¡Sí Mateo! Estuvo genial 🚀 ¿Jugamos más tarde?",
+      "createdAt": "2026-03-02T10:17:00Z",
+      "status": "read"
+    },
+    {
+      "id": "msg_epi_welcome",
+      "conversationId": "conv_epibot",
+      "senderId": "assistant_epibot",
+      "content": "¡Hola! Soy Epibot 🧸✨ Tu asistente inteligente y seguro. Puedes preguntarme adivinanzas, chistes sanos o curiosidades.",
+      "createdAt": "2026-01-10T10:00:00Z",
+      "status": "read"
+    },
+    {
+      "id": "msg_1790031143215_7cd7",
+      "conversationId": "conv_alex_mateo",
+      "senderId": "user_alex",
+      "content": "¡Hola Mateo! Mensaje en vivo.",
+      "createdAt": "2026-09-21T22:52:23.215Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790031145223_goxc",
+      "conversationId": "conv_alex_mateo",
+      "senderId": "user_mateo",
+      "content": "¡Hola Alex! Te respondo yo mismo.",
+      "createdAt": "2026-09-21T22:52:25.223Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790031312332_o915",
+      "conversationId": "conv_alex_mateo",
+      "senderId": "user_alex",
+      "content": "hola",
+      "createdAt": "2026-09-21T22:55:12.332Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790031322621_0nns",
+      "conversationId": "conv_alex_mateo",
+      "senderId": "user_alex",
+      "content": "q haces",
+      "createdAt": "2026-09-21T22:55:22.621Z",
+      "status": "sent"
+    }
+  ],
+  "reports": []
+}
