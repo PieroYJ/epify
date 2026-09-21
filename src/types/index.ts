@@ -50,4 +50,4 @@ export interface ReportItem {
   createdAt: string;
 }
 
-export type ActiveTab = 'home' | 'friends' | 'search' | 'requests' | 'assistant' | 'profile';
+export type ActiveTab = 'home' | 'friends' | 'search' | 'requests' | 'assistant' | 'games' | 'profile';

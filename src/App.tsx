@@ -9,6 +9,7 @@ import { RequestsView } from './components/requests/RequestsView';
 import { SearchFriendsView } from './components/search/SearchFriendsView';
 import { ChatView } from './components/chat/ChatView';
 import { EpibotView } from './components/assistant/EpibotView';
+import { GamesView } from './components/games/GamesView';
 import { ProfileView } from './components/profile/ProfileView';
 import { LoginView } from './components/auth/LoginView';
 import './styles/components.css';
@@ -43,6 +44,8 @@ const EpifyMain: React.FC = () => {
         return <RequestsView />;
       case 'assistant':
         return <EpibotView />;
+      case 'games':
+        return <GamesView />;
       case 'profile':
         return <ProfileView />;
       default:

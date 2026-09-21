@@ -113,7 +113,23 @@ export const HomeView: React.FC = () => {
             <span className="action-icon">🤖</span>
             <div className="action-text">
               <strong>Epibot IA</strong>
-              <span>Chistes, adivinanzas y diversión segura</span>
+              <span>Chistes, adivinanzas y diversión</span>
+            </div>
+          </div>
+
+          <div
+            className="action-btn-large"
+            style={{
+              background: 'var(--accent-yellow-light)',
+              borderColor: '#FFE58F',
+              gridColumn: 'span 2',
+            }}
+            onClick={() => setActiveTab('games')}
+          >
+            <span className="action-icon">🧱</span>
+            <div className="action-text">
+              <strong style={{ color: '#8A6800' }}>Juegos Kids — Tetris</strong>
+              <span>¡Juega al clásico Tetris con controles táctiles seguros!</span>
             </div>
           </div>
         </div>

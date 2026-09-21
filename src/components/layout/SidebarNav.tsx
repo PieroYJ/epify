@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Users, Search, UserCheck, Bot, User, ShieldCheck } from 'lucide-react';
+import { Home, Users, Search, Gamepad2, UserCheck, Bot, User, ShieldCheck } from 'lucide-react';
 import { useEpify } from '../../context/EpifyContext';
 import type { ActiveTab } from '../../types';
 
@@ -20,6 +20,7 @@ export const SidebarNav: React.FC = () => {
     { tab: 'home', label: 'Inicio', icon: <Home size={18} /> },
     { tab: 'friends', label: 'Mis Amigos', icon: <Users size={18} /> },
     { tab: 'search', label: 'Buscar Amigos', icon: <Search size={18} /> },
+    { tab: 'games', label: 'Juegos (Tetris) 🎮', icon: <Gamepad2 size={18} /> },
     {
       tab: 'requests',
       label: 'Solicitudes',
