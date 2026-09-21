@@ -96,3 +96,16 @@ Documento técnico que detalla la arquitectura, lenguajes, frameworks, librería
 2. **Cero Respuestas Automáticas en Cuentas Humanas**: Cada mensaje recibido proviene exclusivamente de la persona autenticada en esa cuenta.
 3. **Epibot IA**: Mascota y asistente virtual preprogramado con filtros de seguridad, adivinanzas, chistes sanos y curiosidades para menores.
 4. **Sistema de Bloqueo y Reportes Confidenciales**: Acciones preventivas inmediatas para proteger la experiencia de los niños.
+
+---
+
+## 8. 🎮 Módulo de Juegos Infantiles Seguros
+
+* **Tetris Kids (Nativo HTML5 Canvas)**:
+  * Motor de juego desarrollado en React y Canvas API con estética alegre para menores.
+  * Sistema de rotación con wall-kicks, detección atómica de colisiones, proyección de caída (*ghost piece*), caída rápida instantánea (*hard drop*), cálculo de líneas y puntuación persistente en `localStorage`.
+* **Google PAC-MAN (Doodle 30.° Aniversario)**:
+  * Integración completa y autónoma del legendario juego interactivo de Google Pac-Man.
+  * Modernizado con sintetizador de audio **Web Audio API** (sin dependencias obsoletas ni Flash) y alojado de forma local/offline para garantizar velocidad, cero rastreadores y cero publicidad externa.
+  * Adaptado con controles táctiles móviles (D-Pad virtual y gestos swipe en pantalla) y controles clásicos de teclado.
+

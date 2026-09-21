@@ -172,28 +172,35 @@ export const TetrisGame: React.FC = () => {
     [currentPiece, piecePos, checkCollision, isPlaying, isPaused, gameOver]
   );
 
-  // Bajar pieza un paso
-  const dropPiece = useCallback(() => {
-    if (!isPlaying || isPaused || gameOver) return;
+  // Fijar pieza y generar la siguiente de forma atómica
+  const lockPiece = useCallback(
+    (
+      shape: number[][],
+      color: string,
+      pos: { x: number; y: number },
+      currentBoard: (string | null)[][]
+    ) => {
+      const newBoard = currentBoard.map((row) => [...row]);
+      let isOutOfBounds = false;
 
-    if (!checkCollision(currentPiece.shape, { x: piecePos.x, y: piecePos.y + 1 })) {
-      setPiecePos((prev) => ({ ...prev, y: prev.y + 1 }));
-    } else {
-      // Fijar pieza en el tablero
-      const newBoard = board.map((row) => [...row]);
-      for (let r = 0; r < currentPiece.shape.length; r++) {
-        for (let c = 0; c < currentPiece.shape[r].length; c++) {
-          if (currentPiece.shape[r][c] !== 0) {
-            const y = piecePos.y + r;
-            const x = piecePos.x + c;
+      for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[r].length; c++) {
+          if (shape[r][c] !== 0) {
+            const y = pos.y + r;
+            const x = pos.x + c;
             if (y < 0) {
-              setGameOver(true);
-              setIsPlaying(false);
-              return;
+              isOutOfBounds = true;
+            } else if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
+              newBoard[y][x] = color;
             }
-            newBoard[y][x] = currentPiece.color;
           }
         }
+      }
+
+      if (isOutOfBounds) {
+        setGameOver(true);
+        setIsPlaying(false);
+        return;
       }
 
       // Limpiar líneas completadas
@@ -250,32 +257,45 @@ export const TetrisGame: React.FC = () => {
         setNextPiece(brandNew);
         setPiecePos({ x: 3, y: 0 });
       }
-    }
-  }, [
-    isPlaying,
-    isPaused,
-    gameOver,
-    currentPiece,
-    nextPiece,
-    piecePos,
-    board,
-    checkCollision,
-    score,
-    lines,
-    level,
-    highScore,
-  ]);
+    },
+    [level, score, lines, highScore, nextPiece, checkCollision]
+  );
 
-  // Caída rápida (Hard Drop)
+  // Bajar pieza un paso suave
+  const dropPiece = useCallback(() => {
+    if (!isPlaying || isPaused || gameOver) return;
+
+    if (!checkCollision(currentPiece.shape, { x: piecePos.x, y: piecePos.y + 1 }, board)) {
+      setPiecePos((prev) => ({ ...prev, y: prev.y + 1 }));
+    } else {
+      lockPiece(currentPiece.shape, currentPiece.color, piecePos, board);
+    }
+  }, [isPlaying, isPaused, gameOver, currentPiece, piecePos, board, checkCollision, lockPiece]);
+
+  // Caída rápida (Hard Drop): instantánea y atómica sin desvanecer ni sobreescribir bloques
   const hardDrop = useCallback(() => {
     if (!isPlaying || isPaused || gameOver) return;
-    let newY = piecePos.y;
-    while (!checkCollision(currentPiece.shape, { x: piecePos.x, y: newY + 1 })) {
-      newY++;
+
+    let targetY = piecePos.y;
+    while (!checkCollision(currentPiece.shape, { x: piecePos.x, y: targetY + 1 }, board)) {
+      targetY++;
     }
-    setPiecePos((prev) => ({ ...prev, y: newY }));
-    setTimeout(() => dropPiece(), 40);
-  }, [isPlaying, isPaused, gameOver, currentPiece, piecePos, checkCollision, dropPiece]);
+
+    const dropBonus = (targetY - piecePos.y) * 2;
+    if (dropBonus > 0) {
+      setScore((prev) => {
+        const s = prev + dropBonus;
+        if (s > highScore) {
+          setHighScore(s);
+          localStorage.setItem('epify_tetris_highscore', String(s));
+        }
+        return s;
+      });
+    }
+
+    // Fijar la pieza directamente en targetY en este mismo frame
+    lockPiece(currentPiece.shape, currentPiece.color, { x: piecePos.x, y: targetY }, board);
+  }, [isPlaying, isPaused, gameOver, currentPiece, piecePos, board, checkCollision, lockPiece, highScore]);
 
   // Game loop
   useEffect(() => {
@@ -332,8 +352,37 @@ export const TetrisGame: React.FC = () => {
       }
     }
 
-    // Dibujar pieza actual en movimiento
+    // Dibujar sombra / ghost piece de caída
     if (isPlaying && !gameOver) {
+      let ghostY = piecePos.y;
+      while (!checkCollision(currentPiece.shape, { x: piecePos.x, y: ghostY + 1 }, board)) {
+        ghostY++;
+      }
+
+      if (ghostY > piecePos.y) {
+        for (let r = 0; r < currentPiece.shape.length; r++) {
+          for (let c = 0; c < currentPiece.shape[r].length; c++) {
+            if (currentPiece.shape[r][c] !== 0) {
+              const x = (piecePos.x + c) * BLOCK_SIZE;
+              const y = (ghostY + r) * BLOCK_SIZE;
+              if (y >= 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+                ctx.beginPath();
+                ctx.roundRect(x + 2, y + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4, 4);
+                ctx.fill();
+
+                ctx.strokeStyle = currentPiece.color;
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 3]);
+                ctx.strokeRect(x + 2, y + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+                ctx.setLineDash([]);
+              }
+            }
+          }
+        }
+      }
+
+      // Dibujar pieza actual en movimiento
       for (let r = 0; r < currentPiece.shape.length; r++) {
         for (let c = 0; c < currentPiece.shape[r].length; c++) {
           if (currentPiece.shape[r][c] !== 0) {
@@ -346,7 +395,7 @@ export const TetrisGame: React.FC = () => {
         }
       }
     }
-  }, [board, currentPiece, piecePos, isPlaying, gameOver]);
+  }, [board, currentPiece, piecePos, isPlaying, gameOver, checkCollision]);
 
   // Renderizar preview de siguiente pieza
   useEffect(() => {
