@@ -22,7 +22,7 @@ setupSocketServer(io);
 
 // Helper para limpiar PIN antes de enviar al frontend
 function sanitizeUser(user: DBUser) {
-  const { pin, ...safeUser } = user;
+  const { pin: _pin, ...safeUser } = user;
   return safeUser;
 }
 
@@ -72,7 +72,91 @@ app.post('/api/auth/register', (req, res) => {
   };
 
   db.createUser(newUser);
+  io.emit('user_created', sanitizeUser(newUser));
+  io.emit('users_updated', db.getUsers().map(sanitizeUser));
   return res.status(201).json({ success: true, user: sanitizeUser(newUser) });
+});
+
+// 2b. Endpoint Administrador: Crear cualquier cuenta (niño o administrador)
+app.post('/api/admin/users', (req, res) => {
+  const { adminId, name, username, avatar, pin, role, badge, statusMessage } = req.body;
+  if (!adminId) {
+    return res.status(401).json({ error: 'Identificador de administrador requerido' });
+  }
+
+  const adminUser = db.findUserById(adminId);
+  if (!adminUser || adminUser.role !== 'admin') {
+    return res.status(403).json({ error: 'Acceso denegado: solo administradores pueden gestionar cuentas' });
+  }
+
+  if (!name || !username) {
+    return res.status(400).json({ error: 'El nombre y @usuario son requeridos' });
+  }
+
+  const cleanUsername = username.replace(/^@/, '').toLowerCase().trim();
+  const existing = db.findUserByUsername(cleanUsername);
+  if (existing) {
+    return res.status(409).json({ error: 'Ese @usuario ya está en uso. ¡Elige otro!' });
+  }
+
+  const isRoleAdmin = role === 'admin';
+  const newUser: DBUser = {
+    id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    name: name.trim(),
+    username: cleanUsername,
+    avatar: avatar || (isRoleAdmin ? '🛡️' : '🧒'),
+    pin: pin || '1234',
+    status: 'offline',
+    statusMessage: statusMessage || (isRoleAdmin ? 'Administrador de Epify 🛡️' : '¡Listo para jugar y chatear! 🎮'),
+    badge: badge || (isRoleAdmin ? 'Administrador 🛡️' : 'Nuevo Amigo ✨'),
+    role: isRoleAdmin ? 'admin' : 'user',
+    createdAt: new Date().toISOString(),
+    blockedUserIds: [],
+  };
+
+  db.createUser(newUser);
+  io.emit('user_created', sanitizeUser(newUser));
+  io.emit('users_updated', db.getUsers().map(sanitizeUser));
+
+  return res.status(201).json({ success: true, user: sanitizeUser(newUser) });
+});
+
+// 2c. Endpoint Administrador: Eliminar cuenta
+app.delete('/api/admin/users/:userId', (req, res) => {
+  const { userId } = req.params;
+  const adminId = (req.query.adminId as string) || req.body?.adminId;
+
+  if (!adminId) {
+    return res.status(401).json({ error: 'Identificador de administrador requerido' });
+  }
+
+  const adminUser = db.findUserById(adminId);
+  if (!adminUser || adminUser.role !== 'admin') {
+    return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de administrador' });
+  }
+
+  if (userId === adminId) {
+    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta de administrador' });
+  }
+
+  const userToDelete = db.findUserById(userId);
+  if (!userToDelete) {
+    return res.status(404).json({ error: 'Usuario no encontrado' });
+  }
+
+  const deleted = db.deleteUser(userId);
+  if (!deleted) {
+    return res.status(500).json({ error: 'No se pudo eliminar el usuario' });
+  }
+
+  io.emit('user_deleted', { userId });
+  io.emit('users_updated', db.getUsers().map(sanitizeUser));
+
+  return res.json({
+    success: true,
+    message: `Cuenta de @${userToDelete.username} eliminada con éxito`,
+    userId,
+  });
 });
 
 // 3. Obtener lista pública de usuarios

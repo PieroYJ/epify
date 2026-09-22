@@ -12,6 +12,7 @@ export const SidebarNav: React.FC = () => {
     openChatWithUser,
     activeChatUserId,
     closeChat,
+    isAdmin,
   } = useEpify();
 
   const friends = getFriends();
@@ -29,6 +30,15 @@ export const SidebarNav: React.FC = () => {
     },
     { tab: 'assistant', label: 'Asistente Epibot 🧸', icon: <Bot size={18} /> },
     { tab: 'profile', label: 'Mi Perfil', icon: <User size={18} /> },
+    ...(isAdmin
+      ? [
+          {
+            tab: 'admin' as ActiveTab,
+            label: 'Panel Admin 🛡️',
+            icon: <ShieldCheck size={18} color="var(--brand-primary)" />,
+          },
+        ]
+      : []),
   ];
 
   const handleNavClick = (tab: ActiveTab) => {

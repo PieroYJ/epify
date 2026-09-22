@@ -1,6 +1,19 @@
 {
   "users": [
     {
+      "id": "user_admin",
+      "username": "admin",
+      "name": "Administrador Epify",
+      "avatar": "🛡️",
+      "pin": "1234",
+      "status": "online",
+      "statusMessage": "Panel de Control y Supervisión ⚙️",
+      "badge": "Administrador 🛡️",
+      "role": "admin",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "blockedUserIds": []
+    },
+    {
       "id": "user_alex",
       "username": "alex123",
       "name": "Alex",

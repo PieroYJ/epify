@@ -137,3 +137,51 @@ export async function resetServerDataApi(): Promise<boolean> {
     return false;
   }
 }
+
+export async function adminCreateUserApi(
+  adminId: string,
+  userData: {
+    name: string;
+    username: string;
+    avatar: string;
+    pin: string;
+    role?: 'admin' | 'user';
+    badge?: string;
+    statusMessage?: string;
+  }
+): Promise<{ success: boolean; user?: User; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, ...userData }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Error al crear la cuenta' };
+    }
+    return { success: true, user: data.user };
+  } catch {
+    return { success: false, error: 'No se pudo conectar con el servidor Epify' };
+  }
+}
+
+export async function adminDeleteUserApi(
+  adminId: string,
+  targetUserId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/users/${targetUserId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Error al eliminar la cuenta' };
+    }
+    return { success: true };
+  } catch {
+    return { success: false, error: 'No se pudo conectar con el servidor Epify' };
+  }
+}

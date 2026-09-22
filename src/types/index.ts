@@ -8,6 +8,7 @@ export interface User {
   status: UserStatus;
   statusMessage: string; // ej: "¡Construyendo naves espaciales! 🚀"
   badge?: string; // ej: "Explorador 🌟", "Artista 🎨"
+  role?: 'admin' | 'user';
   createdAt: string;
   blockedUserIds: string[];
 }
@@ -50,4 +51,4 @@ export interface ReportItem {
   createdAt: string;
 }
 
-export type ActiveTab = 'home' | 'friends' | 'search' | 'requests' | 'assistant' | 'games' | 'profile';
+export type ActiveTab = 'home' | 'friends' | 'search' | 'requests' | 'assistant' | 'games' | 'profile' | 'admin';

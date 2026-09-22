@@ -1,10 +1,10 @@
 import React from 'react';
-import { Home, Users, Search, Gamepad2, UserCheck, User } from 'lucide-react';
+import { Home, Users, Search, Gamepad2, UserCheck, User, ShieldCheck } from 'lucide-react';
 import { useEpify } from '../../context/EpifyContext';
 import type { ActiveTab } from '../../types';
 
 export const BottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, unreadRequestsCount, closeChat } = useEpify();
+  const { activeTab, setActiveTab, unreadRequestsCount, closeChat, isAdmin } = useEpify();
 
   const handleTabChange = (tab: ActiveTab) => {
     closeChat();
@@ -23,6 +23,7 @@ export const BottomNav: React.FC = () => {
       badge: unreadRequestsCount > 0 ? unreadRequestsCount : undefined,
     },
     { tab: 'profile', label: 'Perfil', icon: <User size={19} /> },
+    ...(isAdmin ? [{ tab: 'admin' as ActiveTab, label: 'Admin 🛡️', icon: <ShieldCheck size={19} /> }] : []),
   ];
 
   return (

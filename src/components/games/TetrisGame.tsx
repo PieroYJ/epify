@@ -1,12 +1,25 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
-import { Play, Pause, RotateCcw, Trophy, ArrowLeft, ArrowRight, ArrowDown, RefreshCw, Zap } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Trophy,
+  ArrowLeft,
+  ArrowRight,
+  ArrowDown,
+  RefreshCw,
+  Zap,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import { tetrisAudio } from './tetrisAudio';
 
 const COLS = 10;
 const ROWS = 20;
 const BLOCK_SIZE = 24;
 
-// Piezas clásicas de Tetris con colores infantiles alegres
+// Piezas clásicas de Tetris con colores infantiles alegres y vibrantes
 const TETROMINOES = {
   I: {
     shape: [
@@ -69,7 +82,13 @@ const TETROMINOES = {
 type TetrominoKey = keyof typeof TETROMINOES;
 const KEYS: TetrominoKey[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
 
-function getRandomPiece() {
+interface Piece {
+  key: TetrominoKey;
+  shape: number[][];
+  color: string;
+}
+
+function getRandomPiece(): Piece {
   const key = KEYS[Math.floor(Math.random() * KEYS.length)];
   return {
     key,
@@ -86,23 +105,38 @@ export const TetrisGame: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nextCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [board, setBoard] = useState<(string | null)[][]>(createEmptyBoard);
-  const [currentPiece, setCurrentPiece] = useState(getRandomPiece);
-  const [nextPiece, setNextPiece] = useState(getRandomPiece);
-  const [piecePos, setPiecePos] = useState({ x: 3, y: 0 });
-  const [score, setScore] = useState(0);
-  const [lines, setLines] = useState(0);
-  const [level, setLevel] = useState(1);
+  // ================= ESTADO SÍNCRONO DEL JUEGO (REFS) =================
+  // Evita carreras críticas y cierres obsoletos (stale closures) en React
+  const boardRef = useRef<(string | null)[][]>(createEmptyBoard());
+  const currentPieceRef = useRef<Piece>(getRandomPiece());
+  const nextPieceRef = useRef<Piece>(getRandomPiece());
+  const piecePosRef = useRef<{ x: number; y: number }>({ x: 3, y: 0 });
+  const scoreRef = useRef<number>(0);
+  const linesRef = useRef<number>(0);
+  const levelRef = useRef<number>(1);
+  const highScoreRef = useRef<number>(Number(localStorage.getItem('epify_tetris_highscore') || 0));
+  const isPlayingRef = useRef<boolean>(false);
+  const isPausedRef = useRef<boolean>(false);
+  const gameOverRef = useRef<boolean>(false);
+  const dropTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHardDroppingRef = useRef<boolean>(false);
+  const dropTickRef = useRef<() => void>(() => {});
+
+  // ================= ESTADOS DE REACT PARA ACTUALIZAR LA INTERFAZ =================
+  const [score, setScore] = useState<number>(0);
+  const [lines, setLines] = useState<number>(0);
+  const [level, setLevel] = useState<number>(1);
   const [highScore, setHighScore] = useState<number>(() => {
     return Number(localStorage.getItem('epify_tetris_highscore') || 0);
   });
-  const [gameOver, setGameOver] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [gameOver, setGameOver] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(() => tetrisAudio.getMuted());
 
-  // Comprobar colisión
+  // Comprobar colisión síncrona contra cualquier tablero (por defecto el actual)
   const checkCollision = useCallback(
-    (shape: number[][], offset: { x: number; y: number }, currentBoard = board) => {
+    (shape: number[][], offset: { x: number; y: number }, testBoard = boardRef.current): boolean => {
       for (let r = 0; r < shape.length; r++) {
         for (let c = 0; c < shape[r].length; c++) {
           if (shape[r][c] !== 0) {
@@ -112,7 +146,7 @@ export const TetrisGame: React.FC = () => {
             if (newX < 0 || newX >= COLS || newY >= ROWS) {
               return true;
             }
-            if (newY >= 0 && currentBoard[newY][newX] !== null) {
+            if (newY >= 0 && testBoard[newY][newX] !== null) {
               return true;
             }
           }
@@ -120,214 +154,41 @@ export const TetrisGame: React.FC = () => {
       }
       return false;
     },
-    [board]
+    []
   );
 
-  // Iniciar juego
-  const startGame = () => {
-    setBoard(createEmptyBoard());
-    const first = getRandomPiece();
-    const second = getRandomPiece();
-    setCurrentPiece(first);
-    setNextPiece(second);
-    setPiecePos({ x: 3, y: 0 });
-    setScore(0);
-    setLines(0);
-    setLevel(1);
-    setGameOver(false);
-    setIsPaused(false);
-    setIsPlaying(true);
+  // Dibuja un bloque individual con esquinas redondeadas y brillo
+  const drawBlock = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    color: string,
+    size = BLOCK_SIZE
+  ) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x + 1.5, y + 1.5, size - 3, size - 3, 5);
+    ctx.fill();
+
+    // Brillo superior amigable estilo gominola
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+    ctx.beginPath();
+    ctx.roundRect(x + 2.5, y + 2.5, size - 5, (size - 4) / 3, 3);
+    ctx.fill();
   };
 
-  // Rotar pieza
-  const rotatePiece = useCallback(() => {
-    if (!isPlaying || isPaused || gameOver) return;
-    const shape = currentPiece.shape;
-    const rotated = shape[0].map((_, i) => shape.map((row) => row[i]).reverse());
-
-    // Wall kicks simples
-    let newX = piecePos.x;
-    if (checkCollision(rotated, { x: newX, y: piecePos.y })) {
-      if (!checkCollision(rotated, { x: newX - 1, y: piecePos.y })) {
-        newX -= 1;
-      } else if (!checkCollision(rotated, { x: newX + 1, y: piecePos.y })) {
-        newX += 1;
-      } else {
-        return;
-      }
-    }
-
-    setCurrentPiece((prev) => ({ ...prev, shape: rotated }));
-    setPiecePos((prev) => ({ ...prev, x: newX }));
-  }, [currentPiece, piecePos, checkCollision, isPlaying, isPaused, gameOver]);
-
-  // Mover lateralmente
-  const moveHorizontal = useCallback(
-    (dir: number) => {
-      if (!isPlaying || isPaused || gameOver) return;
-      if (!checkCollision(currentPiece.shape, { x: piecePos.x + dir, y: piecePos.y })) {
-        setPiecePos((prev) => ({ ...prev, x: prev.x + dir }));
-      }
-    },
-    [currentPiece, piecePos, checkCollision, isPlaying, isPaused, gameOver]
-  );
-
-  // Fijar pieza y generar la siguiente de forma atómica
-  const lockPiece = useCallback(
-    (
-      shape: number[][],
-      color: string,
-      pos: { x: number; y: number },
-      currentBoard: (string | null)[][]
-    ) => {
-      const newBoard = currentBoard.map((row) => [...row]);
-      let isOutOfBounds = false;
-
-      for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[r].length; c++) {
-          if (shape[r][c] !== 0) {
-            const y = pos.y + r;
-            const x = pos.x + c;
-            if (y < 0) {
-              isOutOfBounds = true;
-            } else if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
-              newBoard[y][x] = color;
-            }
-          }
-        }
-      }
-
-      if (isOutOfBounds) {
-        setGameOver(true);
-        setIsPlaying(false);
-        return;
-      }
-
-      // Limpiar líneas completadas
-      let cleared = 0;
-      const filteredBoard = newBoard.filter((row) => {
-        const isFull = row.every((cell) => cell !== null);
-        if (isFull) cleared++;
-        return !isFull;
-      });
-
-      while (filteredBoard.length < ROWS) {
-        filteredBoard.unshift(Array(COLS).fill(null));
-      }
-
-      if (cleared > 0) {
-        const points = [0, 100, 300, 500, 800][cleared] * level;
-        const newScore = score + points;
-        const newLines = lines + cleared;
-        const newLevel = Math.floor(newLines / 5) + 1;
-
-        setScore(newScore);
-        setLines(newLines);
-        setLevel(newLevel);
-        if (newScore > highScore) {
-          setHighScore(newScore);
-          localStorage.setItem('epify_tetris_highscore', String(newScore));
-        }
-
-        if (cleared >= 4) {
-          try {
-            confetti({
-              particleCount: 50,
-              spread: 60,
-              origin: { y: 0.7 },
-              colors: ['#FF7A59', '#FFD93D', '#4D96FF'],
-            });
-          } catch {
-            // Ignorar
-          }
-        }
-      }
-
-      setBoard(filteredBoard);
-
-      // Traer la siguiente pieza
-      const nextP = nextPiece;
-      const brandNew = getRandomPiece();
-
-      if (checkCollision(nextP.shape, { x: 3, y: 0 }, filteredBoard)) {
-        setGameOver(true);
-        setIsPlaying(false);
-      } else {
-        setCurrentPiece(nextP);
-        setNextPiece(brandNew);
-        setPiecePos({ x: 3, y: 0 });
-      }
-    },
-    [level, score, lines, highScore, nextPiece, checkCollision]
-  );
-
-  // Bajar pieza un paso suave
-  const dropPiece = useCallback(() => {
-    if (!isPlaying || isPaused || gameOver) return;
-
-    if (!checkCollision(currentPiece.shape, { x: piecePos.x, y: piecePos.y + 1 }, board)) {
-      setPiecePos((prev) => ({ ...prev, y: prev.y + 1 }));
-    } else {
-      lockPiece(currentPiece.shape, currentPiece.color, piecePos, board);
-    }
-  }, [isPlaying, isPaused, gameOver, currentPiece, piecePos, board, checkCollision, lockPiece]);
-
-  // Caída rápida (Hard Drop): instantánea y atómica sin desvanecer ni sobreescribir bloques
-  const hardDrop = useCallback(() => {
-    if (!isPlaying || isPaused || gameOver) return;
-
-    let targetY = piecePos.y;
-    while (!checkCollision(currentPiece.shape, { x: piecePos.x, y: targetY + 1 }, board)) {
-      targetY++;
-    }
-
-    const dropBonus = (targetY - piecePos.y) * 2;
-    if (dropBonus > 0) {
-      setScore((prev) => {
-        const s = prev + dropBonus;
-        if (s > highScore) {
-          setHighScore(s);
-          localStorage.setItem('epify_tetris_highscore', String(s));
-        }
-        return s;
-      });
-    }
-
-    // Fijar la pieza directamente en targetY en este mismo frame
-    lockPiece(currentPiece.shape, currentPiece.color, { x: piecePos.x, y: targetY }, board);
-  }, [isPlaying, isPaused, gameOver, currentPiece, piecePos, board, checkCollision, lockPiece, highScore]);
-
-  // Game loop
-  useEffect(() => {
-    if (!isPlaying || isPaused || gameOver) return;
-    const speed = Math.max(120, 800 - (level - 1) * 70);
-    const interval = setInterval(dropPiece, speed);
-    return () => clearInterval(interval);
-  }, [isPlaying, isPaused, gameOver, level, dropPiece]);
-
-  // Controles de teclado
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
-        e.preventDefault();
-      }
-      if (e.key === 'ArrowLeft') moveHorizontal(-1);
-      if (e.key === 'ArrowRight') moveHorizontal(1);
-      if (e.key === 'ArrowUp') rotatePiece();
-      if (e.key === 'ArrowDown') dropPiece();
-      if (e.key === ' ') hardDrop();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [moveHorizontal, rotatePiece, dropPiece, hardDrop]);
-
-  // Renderizar canvas principal
-  useEffect(() => {
+  // Renderizar lienzo principal y preview
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    const board = boardRef.current;
+    const currentPiece = currentPieceRef.current;
+    const piecePos = piecePosRef.current;
+    const playing = isPlayingRef.current;
+    const isOver = gameOverRef.current;
 
     // Fondo del tablero
     ctx.fillStyle = '#FFFFFF';
@@ -353,7 +214,7 @@ export const TetrisGame: React.FC = () => {
     }
 
     // Dibujar sombra / ghost piece de caída
-    if (isPlaying && !gameOver) {
+    if (playing && !isOver) {
       let ghostY = piecePos.y;
       while (!checkCollision(currentPiece.shape, { x: piecePos.x, y: ghostY + 1 }, board)) {
         ghostY++;
@@ -382,7 +243,7 @@ export const TetrisGame: React.FC = () => {
         }
       }
 
-      // Dibujar pieza actual en movimiento
+      // Dibujar pieza activa en movimiento
       for (let r = 0; r < currentPiece.shape.length; r++) {
         for (let c = 0; c < currentPiece.shape[r].length; c++) {
           if (currentPiece.shape[r][c] !== 0) {
@@ -395,49 +256,363 @@ export const TetrisGame: React.FC = () => {
         }
       }
     }
-  }, [board, currentPiece, piecePos, isPlaying, gameOver, checkCollision]);
 
-  // Renderizar preview de siguiente pieza
-  useEffect(() => {
-    const canvas = nextCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    // Dibujar preview de la siguiente pieza
+    const nextCanvas = nextCanvasRef.current;
+    if (nextCanvas) {
+      const nextCtx = nextCanvas.getContext('2d');
+      if (nextCtx) {
+        nextCtx.fillStyle = '#FAFBFD';
+        nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
 
-    ctx.fillStyle = '#FAFBFD';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const nextP = nextPieceRef.current;
+        const shape = nextP.shape;
+        const size = 18;
+        const offsetX = (nextCanvas.width - shape[0].length * size) / 2;
+        const offsetY = (nextCanvas.height - shape.length * size) / 2;
 
-    const shape = nextPiece.shape;
-    const size = 18;
-    const offsetX = (canvas.width - shape[0].length * size) / 2;
-    const offsetY = (canvas.height - shape.length * size) / 2;
-
-    for (let r = 0; r < shape.length; r++) {
-      for (let c = 0; c < shape[r].length; c++) {
-        if (shape[r][c] !== 0) {
-          drawBlock(ctx, offsetX + c * size, offsetY + r * size, nextPiece.color, size);
+        for (let r = 0; r < shape.length; r++) {
+          for (let c = 0; c < shape[r].length; c++) {
+            if (shape[r][c] !== 0) {
+              drawBlock(nextCtx, offsetX + c * size, offsetY + r * size, nextP.color, size);
+            }
+          }
         }
       }
     }
-  }, [nextPiece]);
+  }, [checkCollision]);
 
-  function drawBlock(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, size = BLOCK_SIZE) {
-    // Relleno redondeado suave
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.roundRect(x + 1.5, y + 1.5, size - 3, size - 3, 5);
-    ctx.fill();
+  // Limpiar temporizador de caída
+  const clearDropTimer = useCallback(() => {
+    if (dropTimerRef.current) {
+      clearTimeout(dropTimerRef.current);
+      dropTimerRef.current = null;
+    }
+  }, []);
 
-    // Brillo superior amigable
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.beginPath();
-    ctx.roundRect(x + 2, y + 2, size - 4, (size - 4) / 3, 3);
-    ctx.fill();
-  }
+  // Programar siguiente caída automática
+  const scheduleNextTick = useCallback(() => {
+    clearDropTimer();
+    if (!isPlayingRef.current || isPausedRef.current || gameOverRef.current) return;
+
+    const speed = Math.max(120, 800 - (levelRef.current - 1) * 70);
+    dropTimerRef.current = setTimeout(() => {
+      dropTickRef.current();
+    }, speed);
+  }, [clearDropTimer]);
+
+  // Fijar la pieza actual en una posición (x, y) de forma síncrona en el tablero
+  const lockPieceAt = useCallback(
+    (x: number, y: number) => {
+      const currentPiece = currentPieceRef.current;
+      const board = boardRef.current;
+
+      // 1. Integrar bloques de la pieza en el tablero
+      let isOutOfBounds = false;
+      for (let r = 0; r < currentPiece.shape.length; r++) {
+        for (let c = 0; c < currentPiece.shape[r].length; c++) {
+          if (currentPiece.shape[r][c] !== 0) {
+            const boardY = y + r;
+            const boardX = x + c;
+            if (boardY < 0) {
+              isOutOfBounds = true;
+            } else if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
+              board[boardY][boardX] = currentPiece.color;
+            }
+          }
+        }
+      }
+
+      if (isOutOfBounds) {
+        gameOverRef.current = true;
+        isPlayingRef.current = false;
+        clearDropTimer();
+        setGameOver(true);
+        setIsPlaying(false);
+        tetrisAudio.playGameOver();
+        draw();
+        return;
+      }
+
+      // 2. Limpiar líneas completas
+      let cleared = 0;
+      const filteredBoard = board.filter((row) => {
+        const isFull = row.every((cell) => cell !== null);
+        if (isFull) cleared++;
+        return !isFull;
+      });
+
+      while (filteredBoard.length < ROWS) {
+        filteredBoard.unshift(Array(COLS).fill(null));
+      }
+      boardRef.current = filteredBoard;
+
+      // 3. Puntuación y efectos
+      if (cleared > 0) {
+        const points = [0, 100, 300, 500, 800][cleared] * levelRef.current;
+        const newScore = scoreRef.current + points;
+        const newLines = linesRef.current + cleared;
+        const newLevel = Math.floor(newLines / 5) + 1;
+
+        scoreRef.current = newScore;
+        linesRef.current = newLines;
+        levelRef.current = newLevel;
+
+        setScore(newScore);
+        setLines(newLines);
+        setLevel(newLevel);
+
+        if (newScore > highScoreRef.current) {
+          highScoreRef.current = newScore;
+          setHighScore(newScore);
+          localStorage.setItem('epify_tetris_highscore', String(newScore));
+        }
+
+        tetrisAudio.playLineClear(cleared);
+
+        if (cleared >= 4) {
+          try {
+            confetti({
+              particleCount: 50,
+              spread: 60,
+              origin: { y: 0.7 },
+              colors: ['#FF7A59', '#FFD93D', '#4D96FF'],
+            });
+          } catch {}
+        }
+      }
+
+      // 4. Traer la siguiente pieza de forma síncrona
+      const spawnedPiece = nextPieceRef.current;
+      const brandNew = getRandomPiece();
+
+      currentPieceRef.current = spawnedPiece;
+      nextPieceRef.current = brandNew;
+      piecePosRef.current = { x: 3, y: 0 };
+
+      // 5. Verificar Game Over para la nueva pieza
+      if (checkCollision(spawnedPiece.shape, { x: 3, y: 0 }, boardRef.current)) {
+        gameOverRef.current = true;
+        isPlayingRef.current = false;
+        clearDropTimer();
+        setGameOver(true);
+        setIsPlaying(false);
+        tetrisAudio.playGameOver();
+      }
+
+      draw();
+    },
+    [checkCollision, clearDropTimer, draw]
+  );
+
+  // Caída automática de un paso (tick)
+  const dropTick = useCallback(() => {
+    if (!isPlayingRef.current || isPausedRef.current || gameOverRef.current) return;
+
+    const currentPiece = currentPieceRef.current;
+    const currentPos = piecePosRef.current;
+    const board = boardRef.current;
+
+    if (!checkCollision(currentPiece.shape, { x: currentPos.x, y: currentPos.y + 1 }, board)) {
+      piecePosRef.current = { ...currentPos, y: currentPos.y + 1 };
+      draw();
+      scheduleNextTick();
+    } else {
+      lockPieceAt(currentPos.x, currentPos.y);
+      if (isPlayingRef.current && !gameOverRef.current) {
+        scheduleNextTick();
+      }
+    }
+  }, [checkCollision, draw, lockPieceAt, scheduleNextTick]);
+
+  // Mantener la referencia actualizada de dropTick
+  useEffect(() => {
+    dropTickRef.current = dropTick;
+  }, [dropTick]);
+
+  // Iniciar partida
+  const startGame = useCallback(() => {
+    clearDropTimer();
+    boardRef.current = createEmptyBoard();
+
+    const first = getRandomPiece();
+    const second = getRandomPiece();
+    currentPieceRef.current = first;
+    nextPieceRef.current = second;
+    piecePosRef.current = { x: 3, y: 0 };
+    scoreRef.current = 0;
+    linesRef.current = 0;
+    levelRef.current = 1;
+    isPlayingRef.current = true;
+    isPausedRef.current = false;
+    gameOverRef.current = false;
+    isHardDroppingRef.current = false;
+
+    setScore(0);
+    setLines(0);
+    setLevel(1);
+    setGameOver(false);
+    setIsPaused(false);
+    setIsPlaying(true);
+
+    // Arrancar música de Tetris
+    tetrisAudio.startMusic();
+
+    draw();
+    scheduleNextTick();
+  }, [clearDropTimer, draw, scheduleNextTick]);
+
+  // Rotar pieza en sentido horario con wall kicks
+  const rotatePiece = useCallback(() => {
+    if (!isPlayingRef.current || isPausedRef.current || gameOverRef.current) return;
+
+    const currentPiece = currentPieceRef.current;
+    const shape = currentPiece.shape;
+    const rotated = shape[0].map((_, i) => shape.map((row) => row[i]).reverse());
+
+    let newX = piecePosRef.current.x;
+    const currentY = piecePosRef.current.y;
+    if (checkCollision(rotated, { x: newX, y: currentY }, boardRef.current)) {
+      if (!checkCollision(rotated, { x: newX - 1, y: currentY }, boardRef.current)) {
+        newX -= 1;
+      } else if (!checkCollision(rotated, { x: newX + 1, y: currentY }, boardRef.current)) {
+        newX += 1;
+      } else {
+        return;
+      }
+    }
+
+    currentPieceRef.current = { ...currentPiece, shape: rotated };
+    piecePosRef.current = { ...piecePosRef.current, x: newX };
+    tetrisAudio.playRotate();
+    draw();
+  }, [checkCollision, draw]);
+
+  // Mover lateralmente
+  const moveHorizontal = useCallback(
+    (dir: number) => {
+      if (!isPlayingRef.current || isPausedRef.current || gameOverRef.current) return;
+
+      const currentPiece = currentPieceRef.current;
+      const targetPos = { x: piecePosRef.current.x + dir, y: piecePosRef.current.y };
+
+      if (!checkCollision(currentPiece.shape, targetPos, boardRef.current)) {
+        piecePosRef.current = targetPos;
+        tetrisAudio.playMove();
+        draw();
+      }
+    },
+    [checkCollision, draw]
+  );
+
+  // Bajar suavemente (un paso)
+  const softDrop = useCallback(() => {
+    if (!isPlayingRef.current || isPausedRef.current || gameOverRef.current) return;
+    dropTick();
+  }, [dropTick]);
+
+  // CAÍDA RÁPIDA (Hard Drop) ATÓMICA Y SIN DESAPARICIÓN DE BLOQUES
+  const hardDrop = useCallback(() => {
+    if (!isPlayingRef.current || isPausedRef.current || gameOverRef.current) return;
+    if (isHardDroppingRef.current) return; // Evita ejecución duplicada o reentrante
+    isHardDroppingRef.current = true;
+
+    // 1. Cancelar el temporizador cíclico de inmediato para que ningún tick pendiente sobreescriba
+    clearDropTimer();
+
+    const currentPiece = currentPieceRef.current;
+    const currentX = piecePosRef.current.x;
+    let targetY = piecePosRef.current.y;
+    const currentBoard = boardRef.current;
+
+    // 2. Calcular la posición más baja posible con el tablero síncrono actual
+    while (!checkCollision(currentPiece.shape, { x: currentX, y: targetY + 1 }, currentBoard)) {
+      targetY++;
+    }
+
+    // 3. Sonido de impacto de caída rápida
+    tetrisAudio.playHardDrop();
+
+    // 4. Bonificación de puntos por caída rápida
+    const dropBonus = (targetY - piecePosRef.current.y) * 2;
+    if (dropBonus > 0) {
+      const newScore = scoreRef.current + dropBonus;
+      scoreRef.current = newScore;
+      setScore(newScore);
+      if (newScore > highScoreRef.current) {
+        highScoreRef.current = newScore;
+        setHighScore(newScore);
+        localStorage.setItem('epify_tetris_highscore', String(newScore));
+      }
+    }
+
+    // 5. Fijar inmediatamente la pieza en targetY
+    lockPieceAt(currentX, targetY);
+
+    // 6. Si el juego sigue activo, reprogramar el temporizador para la nueva pieza
+    if (isPlayingRef.current && !gameOverRef.current) {
+      scheduleNextTick();
+    }
+
+    isHardDroppingRef.current = false;
+  }, [clearDropTimer, checkCollision, lockPieceAt, scheduleNextTick]);
+
+  // Alternar pausa
+  const togglePause = useCallback(() => {
+    if (!isPlayingRef.current || gameOverRef.current) return;
+    const nextPaused = !isPausedRef.current;
+    isPausedRef.current = nextPaused;
+    setIsPaused(nextPaused);
+
+    if (nextPaused) {
+      clearDropTimer();
+      tetrisAudio.pauseMusic();
+    } else {
+      tetrisAudio.resumeMusic();
+      scheduleNextTick();
+    }
+  }, [clearDropTimer, scheduleNextTick]);
+
+  // Alternar sonido/música
+  const toggleSound = useCallback(() => {
+    const muted = tetrisAudio.toggleMute();
+    setIsMuted(muted);
+  }, []);
+
+  // Controles de teclado
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+        e.preventDefault();
+      }
+      if (e.key === 'ArrowLeft') moveHorizontal(-1);
+      else if (e.key === 'ArrowRight') moveHorizontal(1);
+      else if (e.key === 'ArrowUp') rotatePiece();
+      else if (e.key === 'ArrowDown') softDrop();
+      else if (e.key === ' ') hardDrop();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [moveHorizontal, rotatePiece, softDrop, hardDrop]);
+
+  // Dibujar estado inicial o redibujar al montar
+  useEffect(() => {
+    draw();
+  }, [draw]);
+
+  // Limpieza al desmontar el componente (parar timers y música)
+  useEffect(() => {
+    return () => {
+      clearDropTimer();
+      tetrisAudio.stopMusic();
+    };
+  }, [clearDropTimer]);
 
   return (
     <div className="view-container animate-fade-in" style={{ alignItems: 'center' }}>
-      <div style={{ textAlign: 'center', width: '100%' }}>
+      {/* Cabecera del juego con botón de sonido */}
+      <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: '1.6rem' }}>🧱</span>
           <h2 style={{ fontSize: '1.4rem' }}>Tetris Kids</h2>
@@ -446,7 +621,7 @@ export const TetrisGame: React.FC = () => {
           </span>
         </div>
         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-          ¡Gira y acomoda los bloques de colores sin tocar el techo!
+          ¡Acomoda los bloques, escucha la música clásica y rompe tu récord!
         </p>
       </div>
 
@@ -454,39 +629,39 @@ export const TetrisGame: React.FC = () => {
       <div
         style={{
           display: 'flex',
-          gap: 12,
+          gap: 10,
           width: '100%',
           maxWidth: 360,
           justifyContent: 'space-between',
         }}
       >
-        <div className="stat-card" style={{ flex: 1, padding: '8px 12px', gap: 8 }}>
-          <div style={{ fontSize: '1.2rem' }}>⭐</div>
+        <div className="stat-card" style={{ flex: 1, padding: '8px 10px', gap: 6 }}>
+          <div style={{ fontSize: '1.1rem' }}>⭐</div>
           <div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{score}</div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Puntos</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>{score}</div>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Puntos</div>
           </div>
         </div>
 
-        <div className="stat-card" style={{ flex: 1, padding: '8px 12px', gap: 8 }}>
-          <Trophy size={20} color="#FFD93D" />
+        <div className="stat-card" style={{ flex: 1, padding: '8px 10px', gap: 6 }}>
+          <Trophy size={18} color="#FFD93D" />
           <div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{highScore}</div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Récord</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>{highScore}</div>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Récord</div>
           </div>
         </div>
 
-        <div className="stat-card" style={{ flex: 1, padding: '8px 12px', gap: 8 }}>
-          <div style={{ fontSize: '1.2rem' }}>🚀</div>
+        <div className="stat-card" style={{ flex: 1, padding: '8px 10px', gap: 6 }}>
+          <div style={{ fontSize: '1.1rem' }}>🚀</div>
           <div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>Nivel {level}</div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{lines} líneas</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>Nivel {level}</div>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{lines} líneas</div>
           </div>
         </div>
       </div>
 
       {/* Contenedor del Juego y Siguiente Pieza */}
-      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'center' }}>
         {/* Tablero Principal */}
         <div
           style={{
@@ -519,10 +694,15 @@ export const TetrisGame: React.FC = () => {
             >
               <div style={{ fontSize: '3rem' }}>🎮</div>
               <h3 style={{ fontSize: '1.2rem', color: 'var(--text-primary)' }}>¿Listo para jugar?</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Usa los botones en pantalla o las flechas de tu teclado.
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: 220 }}>
+                Usa los botones en pantalla o las flechas de tu teclado. ¡Música retro incluida!
               </p>
-              <button className="btn-primary" onClick={startGame} style={{ padding: '10px 24px', fontSize: '0.95rem' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={startGame}
+                style={{ padding: '10px 24px', fontSize: '0.95rem' }}
+              >
                 <Play size={16} /> ¡Jugar Ahora!
               </button>
             </div>
@@ -549,7 +729,7 @@ export const TetrisGame: React.FC = () => {
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Puntaje final: <strong>{score}</strong>
               </p>
-              <button className="btn-primary" onClick={startGame} style={{ padding: '10px 20px', gap: 6 }}>
+              <button type="button" className="btn-primary" onClick={startGame} style={{ padding: '10px 20px', gap: 6 }}>
                 <RotateCcw size={15} /> Jugar otra vez
               </button>
             </div>
@@ -571,44 +751,64 @@ export const TetrisGame: React.FC = () => {
             >
               <div style={{ fontSize: '2.2rem' }}>⏸️</div>
               <h4>Juego en Pausa</h4>
-              <button className="btn-secondary" onClick={() => setIsPaused(false)}>
+              <button type="button" className="btn-secondary" onClick={togglePause}>
                 Reanudar
               </button>
             </div>
           )}
         </div>
 
-        {/* Panel Lateral: Siguiente Pieza y Botones */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Panel Lateral: Siguiente Pieza, Audio y Botones de Control */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 88 }}>
           <div
             style={{
               background: '#FFFFFF',
               border: '1.5px solid var(--border-color)',
               borderRadius: 'var(--radius-md)',
-              padding: 10,
+              padding: 6,
               textAlign: 'center',
             }}
           >
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>
               Siguiente:
             </div>
-            <canvas ref={nextCanvasRef} width={80} height={80} style={{ borderRadius: 'var(--radius-sm)' }} />
+            <canvas ref={nextCanvasRef} width={76} height={76} style={{ borderRadius: 'var(--radius-sm)' }} />
           </div>
+
+          {/* Botón de Música / Sonido */}
+          <button
+            type="button"
+            className={isMuted ? 'btn-muted' : 'btn-secondary'}
+            style={{
+              padding: '8px 10px',
+              fontSize: '0.74rem',
+              gap: 5,
+              borderRadius: 'var(--radius-md)',
+              color: isMuted ? 'var(--text-muted)' : 'var(--brand-primary)',
+            }}
+            onClick={toggleSound}
+            title={isMuted ? 'Activar música y sonidos' : 'Silenciar música y sonidos'}
+          >
+            {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            {isMuted ? 'Mudo' : 'Música'}
+          </button>
 
           {isPlaying && (
             <button
+              type="button"
               className="btn-muted"
-              style={{ padding: '8px 12px', fontSize: '0.78rem', gap: 6 }}
-              onClick={() => setIsPaused(!isPaused)}
+              style={{ padding: '8px 10px', fontSize: '0.74rem', gap: 5, borderRadius: 'var(--radius-md)' }}
+              onClick={togglePause}
             >
               {isPaused ? <Play size={13} /> : <Pause size={13} />}
-              {isPaused ? 'Continuar' : 'Pausa'}
+              {isPaused ? 'Seguir' : 'Pausa'}
             </button>
           )}
 
           <button
+            type="button"
             className="btn-muted"
-            style={{ padding: '8px 12px', fontSize: '0.78rem', gap: 6 }}
+            style={{ padding: '8px 10px', fontSize: '0.74rem', gap: 5, borderRadius: 'var(--radius-md)' }}
             onClick={startGame}
             title="Reiniciar partida"
           >
@@ -617,12 +817,12 @@ export const TetrisGame: React.FC = () => {
         </div>
       </div>
 
-      {/* Controles Táctiles para Niños en Celulares */}
+      {/* Controles Táctiles para Niños en Celulares y Tablets */}
       <div
         style={{
           width: '100%',
           maxWidth: 340,
-          marginTop: 8,
+          marginTop: 10,
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
@@ -630,6 +830,7 @@ export const TetrisGame: React.FC = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
           <button
+            type="button"
             className="btn-secondary"
             style={{ flex: 1, padding: '14px 0', fontSize: '1.2rem', borderRadius: 'var(--radius-md)' }}
             onClick={() => moveHorizontal(-1)}
@@ -639,6 +840,7 @@ export const TetrisGame: React.FC = () => {
           </button>
 
           <button
+            type="button"
             className="btn-primary"
             style={{ flex: 1.3, padding: '14px 0', fontSize: '0.9rem', borderRadius: 'var(--radius-md)', gap: 6 }}
             onClick={rotatePiece}
@@ -648,6 +850,7 @@ export const TetrisGame: React.FC = () => {
           </button>
 
           <button
+            type="button"
             className="btn-secondary"
             style={{ flex: 1, padding: '14px 0', fontSize: '1.2rem', borderRadius: 'var(--radius-md)' }}
             onClick={() => moveHorizontal(1)}
@@ -659,18 +862,20 @@ export const TetrisGame: React.FC = () => {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
+            type="button"
             className="btn-muted"
             style={{ flex: 1, padding: '12px 0', fontSize: '0.85rem', borderRadius: 'var(--radius-md)', gap: 6 }}
-            onClick={dropPiece}
-            title="Bajar suave"
+            onClick={softDrop}
+            title="Bajar un paso"
           >
             <ArrowDown size={18} /> Bajar
           </button>
 
           <button
+            type="button"
             className="btn-secondary"
             style={{
-              flex: 1,
+              flex: 1.2,
               padding: '12px 0',
               fontSize: '0.85rem',
               borderRadius: 'var(--radius-md)',
@@ -678,6 +883,7 @@ export const TetrisGame: React.FC = () => {
               background: 'var(--accent-yellow-light)',
               color: '#8A6800',
               borderColor: '#FFE58F',
+              fontWeight: 700,
             }}
             onClick={hardDrop}
             title="Caída rápida instantánea"

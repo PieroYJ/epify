@@ -137,8 +137,9 @@ export const LoginView: React.FC = () => {
               marginBottom: 16,
             }}
           >
-            {users.slice(0, 6).map((u) => {
+            {users.slice(0, 8).map((u) => {
               const isLoading = loadingUser === u.username;
+              const isUserAdmin = u.role === 'admin';
               return (
                 <button
                   key={u.id}
@@ -150,19 +151,19 @@ export const LoginView: React.FC = () => {
                     gap: 10,
                     padding: '10px 12px',
                     borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-subtle)',
-                    border: '1.5px solid var(--border-color)',
+                    background: isUserAdmin ? '#FBF9FF' : 'var(--bg-subtle)',
+                    border: isUserAdmin ? '1.5px solid #DDD6FE' : '1.5px solid var(--border-color)',
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--secondary)';
-                    e.currentTarget.style.background = 'var(--secondary-light)';
+                    e.currentTarget.style.borderColor = isUserAdmin ? '#8B5CF6' : 'var(--secondary)';
+                    e.currentTarget.style.background = isUserAdmin ? '#EDE9FE' : 'var(--secondary-light)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border-color)';
-                    e.currentTarget.style.background = 'var(--bg-subtle)';
+                    e.currentTarget.style.borderColor = isUserAdmin ? '#DDD6FE' : 'var(--border-color)';
+                    e.currentTarget.style.background = isUserAdmin ? '#FBF9FF' : 'var(--bg-subtle)';
                   }}
                 >
                   <span style={{ fontSize: '1.75rem', flexShrink: 0 }}>{u.avatar}</span>
@@ -175,9 +176,26 @@ export const LoginView: React.FC = () => {
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
                       }}
                     >
-                      {u.name}
+                      <span>{u.name}</span>
+                      {isUserAdmin && (
+                        <span
+                          style={{
+                            fontSize: '0.6rem',
+                            background: '#EDE9FE',
+                            color: '#6D28D9',
+                            padding: '1px 5px',
+                            borderRadius: 'var(--radius-full)',
+                            fontWeight: 800,
+                          }}
+                        >
+                          Admin
+                        </span>
+                      )}
                     </div>
                     <div
                       style={{

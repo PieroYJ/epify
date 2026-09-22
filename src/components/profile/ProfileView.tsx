@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Unlock, RotateCcw, Check, LogOut, Sparkles } from 'lucide-react';
+import { Shield, Unlock, RotateCcw, Check, LogOut, Sparkles, ShieldCheck } from 'lucide-react';
 import { useEpify } from '../../context/EpifyContext';
 import type { UserStatus } from '../../types';
 
@@ -11,6 +11,8 @@ export const ProfileView: React.FC = () => {
     unblockUser,
     resetDemoData,
     logout,
+    isAdmin,
+    setActiveTab,
   } = useEpify();
 
   if (!currentUser) return null;
@@ -88,6 +90,25 @@ export const ProfileView: React.FC = () => {
               <Shield size={12} />
               <span>Cuenta Protegida Epify</span>
             </div>
+
+            {isAdmin && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setActiveTab('admin')}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '6px 14px',
+                    gap: 6,
+                    background: '#7C3AED',
+                    borderColor: '#6D28D9',
+                  }}
+                >
+                  <ShieldCheck size={14} /> Abrir Panel de Administración
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

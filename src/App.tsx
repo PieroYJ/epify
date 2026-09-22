@@ -11,6 +11,7 @@ import { ChatView } from './components/chat/ChatView';
 import { EpibotView } from './components/assistant/EpibotView';
 import { GamesView } from './components/games/GamesView';
 import { ProfileView } from './components/profile/ProfileView';
+import { AdminView } from './components/admin/AdminView';
 import { LoginView } from './components/auth/LoginView';
 import './styles/components.css';
 
@@ -48,6 +49,8 @@ const EpifyMain: React.FC = () => {
         return <GamesView />;
       case 'profile':
         return <ProfileView />;
+      case 'admin':
+        return <AdminView />;
       default:
         return <HomeView />;
     }

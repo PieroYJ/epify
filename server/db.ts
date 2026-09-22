@@ -10,6 +10,7 @@ export interface DBUser {
   status: 'online' | 'playing' | 'studying' | 'offline';
   statusMessage: string;
   badge?: string;
+  role?: 'admin' | 'user';
   createdAt: string;
   blockedUserIds: string[];
 }
@@ -61,6 +62,19 @@ const DATA_DIR = path.join(process.cwd(), 'server', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 const INITIAL_SEED_USERS: DBUser[] = [
+  {
+    id: 'user_admin',
+    username: 'admin',
+    name: 'Administrador Epify',
+    avatar: '🛡️',
+    pin: '1234',
+    status: 'online',
+    statusMessage: 'Panel de Control y Supervisión ⚙️',
+    badge: 'Administrador 🛡️',
+    role: 'admin',
+    createdAt: '2026-01-01T00:00:00Z',
+    blockedUserIds: [],
+  },
   {
     id: 'user_alex',
     username: 'alex123',
@@ -268,7 +282,13 @@ class Database {
 
     try {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
-      return JSON.parse(content);
+      const parsed: DatabaseSchema = JSON.parse(content);
+      // Garantizar que la cuenta de administrador exista siempre
+      if (!parsed.users.some((u) => u.username === 'admin' || u.role === 'admin')) {
+        parsed.users.unshift(INITIAL_SEED_USERS[0]);
+        this.saveDirect(parsed);
+      }
+      return parsed;
     } catch {
       const fallback: DatabaseSchema = {
         users: INITIAL_SEED_USERS,
@@ -329,6 +349,49 @@ class Database {
     Object.assign(user, partial);
     this.save();
     return user;
+  }
+
+  public deleteUser(userId: string): boolean {
+    const userIndex = this.data.users.findIndex((u) => u.id === userId);
+    if (userIndex === -1) return false;
+
+    // 1. Eliminar de la lista de usuarios
+    this.data.users.splice(userIndex, 1);
+
+    // 2. Eliminar solicitudes de amistad enviadas o recibidas
+    this.data.friendRequests = this.data.friendRequests.filter(
+      (r) => r.senderId !== userId && r.receiverId !== userId
+    );
+
+    // 3. Obtener IDs de conversaciones involucradas para limpiar mensajes
+    const convsToRemove = this.data.conversations
+      .filter((c) => c.participantA === userId || c.participantB === userId)
+      .map((c) => c.id);
+
+    // 4. Eliminar conversaciones
+    this.data.conversations = this.data.conversations.filter(
+      (c) => c.participantA !== userId && c.participantB !== userId
+    );
+
+    // 5. Eliminar mensajes asociados
+    this.data.messages = this.data.messages.filter(
+      (m) => m.senderId !== userId && !convsToRemove.includes(m.conversationId)
+    );
+
+    // 6. Limpiar bloqueos en otros usuarios
+    this.data.users.forEach((u) => {
+      if (u.blockedUserIds && u.blockedUserIds.includes(userId)) {
+        u.blockedUserIds = u.blockedUserIds.filter((id) => id !== userId);
+      }
+    });
+
+    // 7. Limpiar reportes asociados
+    this.data.reports = this.data.reports.filter(
+      (rep) => rep.reporterId !== userId && rep.reportedUserId !== userId
+    );
+
+    this.save();
+    return true;
   }
 
   // --- Operaciones de Amistades ---

@@ -19,12 +19,15 @@ import {
   unblockUserApi,
   reportUserApi,
   resetServerDataApi,
+  adminCreateUserApi,
+  adminDeleteUserApi,
 } from '../services/api';
 import { connectSocket, disconnectSocket, getSocket } from '../services/socket';
 
 interface EpifyContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   users: User[];
   friendRequests: FriendRequest[];
   conversations: Conversation[];
@@ -42,6 +45,16 @@ interface EpifyContextType {
     avatar: string,
     pin: string
   ) => Promise<{ success: boolean; error?: string }>;
+  adminCreateUser: (userData: {
+    name: string;
+    username: string;
+    avatar: string;
+    pin: string;
+    role?: 'admin' | 'user';
+    badge?: string;
+    statusMessage?: string;
+  }) => Promise<{ success: boolean; user?: User; error?: string }>;
+  adminDeleteUser: (targetUserId: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   sendFriendRequest: (targetUserId: string) => { success: boolean; message: string };
   acceptFriendRequest: (requestId: string) => void;
@@ -273,6 +286,30 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
     });
 
+    // Usuario creado en tiempo real
+    socket.on('user_created', (newUser: User) => {
+      setUsers((prev) => {
+        if (prev.some((u) => u.id === newUser.id)) return prev;
+        return [...prev, newUser];
+      });
+    });
+
+    // Usuario eliminado en tiempo real
+    socket.on('user_deleted', ({ userId }: { userId: string }) => {
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setFriendRequests((prev) => prev.filter((r) => r.senderId !== userId && r.receiverId !== userId));
+      setConversations((prev) => prev.filter((c) => c.participantA !== userId && c.participantB !== userId));
+      setMessages((prev) => prev.filter((m) => m.senderId !== userId));
+      setActiveChatUserId((currentChat) => (currentChat === userId ? null : currentChat));
+    });
+
+    // Lista de usuarios actualizada
+    socket.on('users_updated', (updatedUsers: User[]) => {
+      if (Array.isArray(updatedUsers)) {
+        setUsers(updatedUsers);
+      }
+    });
+
     return () => {
       socket.off('online_users');
       socket.off('user_status_changed');
@@ -284,6 +321,9 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       socket.off('friend_request_cancelled');
       socket.off('error_message');
       socket.off('data_reset');
+      socket.off('user_created');
+      socket.off('user_deleted');
+      socket.off('users_updated');
     };
   }, [currentUserId]);
 
@@ -316,6 +356,48 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return { success: true };
     }
     return { success: false, error: res.error || 'Error al registrar' };
+  };
+
+  // Crear cuenta desde el panel de administración
+  const adminCreateUser = async (userData: {
+    name: string;
+    username: string;
+    avatar: string;
+    pin: string;
+    role?: 'admin' | 'user';
+    badge?: string;
+    statusMessage?: string;
+  }) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return { success: false, error: 'Acceso denegado: se requieren permisos de administrador' };
+    }
+    const res = await adminCreateUserApi(currentUser.id, userData);
+    if (res.success && res.user) {
+      setUsers((prev) => {
+        if (prev.some((u) => u.id === res.user!.id)) return prev;
+        return [...prev, res.user!];
+      });
+    }
+    return res;
+  };
+
+  // Eliminar cuenta desde el panel de administración
+  const adminDeleteUser = async (targetUserId: string) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return { success: false, error: 'Acceso denegado: se requieren permisos de administrador' };
+    }
+    if (currentUser.id === targetUserId) {
+      return { success: false, error: 'No puedes eliminar tu propia cuenta de administrador' };
+    }
+    const res = await adminDeleteUserApi(currentUser.id, targetUserId);
+    if (res.success) {
+      setUsers((prev) => prev.filter((u) => u.id !== targetUserId));
+      setFriendRequests((prev) => prev.filter((r) => r.senderId !== targetUserId && r.receiverId !== targetUserId));
+      setConversations((prev) => prev.filter((c) => c.participantA !== targetUserId && c.participantB !== targetUserId));
+      setMessages((prev) => prev.filter((m) => m.senderId !== targetUserId));
+      setActiveChatUserId((currentChat) => (currentChat === targetUserId ? null : currentChat));
+    }
+    return res;
   };
 
   // Cerrar sesión en esta pestaña
@@ -562,6 +644,7 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       value={{
         currentUser,
         isAuthenticated: !!currentUser,
+        isAdmin: currentUser?.role === 'admin',
         users,
         friendRequests,
         conversations,
@@ -574,6 +657,8 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         closeChat,
         login,
         register,
+        adminCreateUser,
+        adminDeleteUser,
         logout,
         sendFriendRequest,
         acceptFriendRequest,
