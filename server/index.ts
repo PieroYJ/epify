@@ -255,6 +255,37 @@ app.post('/api/messages', (req, res) => {
   return res.status(201).json({ success: true, message: newMsg, conversation });
 });
 
+// 5c. Endpoint Eliminar Mensaje Individual
+app.delete('/api/messages/:messageId', (req, res) => {
+  const { messageId } = req.params;
+  const { userId, targetUserId, conversationId } = req.body || {};
+
+  const deleted = db.deleteMessage(messageId);
+  if (deleted) {
+    if (userId) io.to(userId).emit('message_deleted', { messageId, conversationId });
+    if (targetUserId && targetUserId !== 'assistant_epibot') {
+      io.to(targetUserId).emit('message_deleted', { messageId, conversationId });
+    }
+  }
+
+  return res.json({ success: true, messageId });
+});
+
+// 5d. Endpoint Limpiar Conversación Completa
+app.delete('/api/conversations/:convId/messages', (req, res) => {
+  const { convId } = req.params;
+  const { userId, targetUserId } = req.body || {};
+
+  db.clearConversationMessages(convId, userId, targetUserId);
+
+  if (userId) io.to(userId).emit('conversation_cleared', { conversationId: convId, userId, targetUserId });
+  if (targetUserId && targetUserId !== 'assistant_epibot') {
+    io.to(targetUserId).emit('conversation_cleared', { conversationId: convId, userId, targetUserId });
+  }
+
+  return res.json({ success: true, conversationId: convId });
+});
+
 // 6. Bloquear usuario
 app.post('/api/user/block', (req, res) => {
   const { userId, targetUserId } = req.body;

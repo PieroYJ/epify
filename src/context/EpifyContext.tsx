@@ -22,6 +22,8 @@ import {
   adminCreateUserApi,
   adminDeleteUserApi,
   sendMessageApi,
+  deleteMessageApi,
+  clearChatApi,
 } from '../services/api';
 import { connectSocket, disconnectSocket, getSocket } from '../services/socket';
 
@@ -62,6 +64,8 @@ interface EpifyContextType {
   rejectFriendRequest: (requestId: string) => void;
   cancelFriendRequest: (requestId: string) => void;
   sendMessage: (receiverId: string, content: string) => { success: boolean; error?: string };
+  deleteMessage: (messageId: string, targetUserId?: string) => Promise<{ success: boolean }>;
+  clearChat: (targetUserId: string) => Promise<{ success: boolean }>;
   blockUser: (targetUserId: string) => void;
   unblockUser: (targetUserId: string) => void;
   reportUser: (targetUserId: string, reason: string, details?: string) => void;
@@ -243,6 +247,40 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             },
           ];
         });
+      }
+    );
+
+    // Mensaje eliminado en tiempo real
+    socket.on('message_deleted', ({ messageId }: { messageId: string }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    });
+
+    // Conversación limpiada en tiempo real
+    socket.on(
+      'conversation_cleared',
+      ({
+        conversationId,
+        userId,
+        targetUserId,
+      }: {
+        conversationId: string;
+        userId?: string;
+        targetUserId?: string;
+      }) => {
+        setMessages((prev) =>
+          prev.filter((m) => {
+            if (m.conversationId === conversationId) return false;
+            if (userId && targetUserId) {
+              if (
+                (m.senderId === userId && m.receiverId === targetUserId) ||
+                (m.senderId === targetUserId && m.receiverId === userId)
+              ) {
+                return false;
+              }
+            }
+            return true;
+          })
+        );
       }
     );
 
@@ -690,6 +728,66 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return { success: true };
   };
 
+  // Eliminar mensaje individual
+  const deleteMessage = async (messageId: string, targetUserId?: string): Promise<{ success: boolean }> => {
+    const msgToDelete = messages.find((m) => m.id === messageId);
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+
+    const effectiveTarget = targetUserId || msgToDelete?.receiverId || (msgToDelete?.senderId !== currentUserId ? msgToDelete?.senderId : undefined);
+    const convId = msgToDelete?.conversationId;
+
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('delete_message', {
+        messageId,
+        conversationId: convId,
+        targetUserId: effectiveTarget,
+      });
+    }
+
+    if (currentUserId) {
+      await deleteMessageApi(messageId, currentUserId, effectiveTarget, convId);
+    }
+
+    return { success: true };
+  };
+
+  // Limpiar conversación completa
+  const clearChat = async (targetUserId: string): Promise<{ success: boolean }> => {
+    if (!currentUserId) return { success: false };
+
+    const conv = conversations.find(
+      (c) =>
+        (c.participantA === currentUserId && c.participantB === targetUserId) ||
+        (c.participantA === targetUserId && c.participantB === currentUserId)
+    );
+    const convId = conv?.id || `conv_${[currentUserId, targetUserId].sort().join('_')}`;
+
+    setMessages((prev) =>
+      prev.filter((m) => {
+        if (conv && m.conversationId === conv.id) return false;
+        if (
+          (m.senderId === currentUserId && m.receiverId === targetUserId) ||
+          (m.senderId === targetUserId && m.receiverId === currentUserId)
+        ) {
+          return false;
+        }
+        return true;
+      })
+    );
+
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('clear_chat', {
+        conversationId: convId,
+        targetUserId,
+      });
+    }
+
+    await clearChatApi(convId, currentUserId, targetUserId);
+    return { success: true };
+  };
+
   // Bloquear usuario
   const blockUser = async (targetUserId: string) => {
     if (!currentUserId) return;
@@ -774,6 +872,8 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         rejectFriendRequest,
         cancelFriendRequest,
         sendMessage,
+        deleteMessage,
+        clearChat,
         blockUser,
         unblockUser,
         reportUser,

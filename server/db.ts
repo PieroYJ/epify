@@ -497,6 +497,33 @@ class Database {
     return this.data.messages;
   }
 
+  public deleteMessage(messageId: string): boolean {
+    const initialLen = this.data.messages.length;
+    this.data.messages = this.data.messages.filter((m) => m.id !== messageId);
+    if (this.data.messages.length !== initialLen) {
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
+  public clearConversationMessages(convId: string, userIdA?: string, userIdB?: string): boolean {
+    this.data.messages = this.data.messages.filter((m) => {
+      if (m.conversationId === convId) return false;
+      if (userIdA && userIdB) {
+        if (
+          (m.senderId === userIdA && m.receiverId === userIdB) ||
+          (m.senderId === userIdB && m.receiverId === userIdA)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+    this.save();
+    return true;
+  }
+
   public getConversations(): DBConversation[] {
     return this.data.conversations;
   }

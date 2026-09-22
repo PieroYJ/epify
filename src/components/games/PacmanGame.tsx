@@ -73,8 +73,8 @@ export const PacmanGame: React.FC = () => {
       <div
         style={{
           width: '100%',
-          maxWidth: 620,
-          height: 490,
+          maxWidth: 640,
+          height: 520,
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
           boxShadow: 'var(--shadow-md)',

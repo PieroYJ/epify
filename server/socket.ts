@@ -175,6 +175,44 @@ export function setupSocketServer(io: SocketIOServer) {
       }
     );
 
+    // Eliminar mensaje individual en tiempo real
+    socket.on(
+      'delete_message',
+      (
+        { messageId, conversationId, targetUserId }: { messageId: string; conversationId?: string; targetUserId?: string },
+        callback?: (res: any) => void
+      ) => {
+        db.deleteMessage(messageId);
+        const sender = currentUserId;
+        if (sender) {
+          io.to(sender).emit('message_deleted', { messageId, conversationId });
+        }
+        if (targetUserId && targetUserId !== 'assistant_epibot') {
+          io.to(targetUserId).emit('message_deleted', { messageId, conversationId });
+        }
+        if (typeof callback === 'function') callback({ success: true, messageId });
+      }
+    );
+
+    // Limpiar conversación completa en tiempo real
+    socket.on(
+      'clear_chat',
+      (
+        { conversationId, targetUserId }: { conversationId: string; targetUserId?: string },
+        callback?: (res: any) => void
+      ) => {
+        db.clearConversationMessages(conversationId, currentUserId || undefined, targetUserId);
+        const sender = currentUserId;
+        if (sender) {
+          io.to(sender).emit('conversation_cleared', { conversationId, userId: sender, targetUserId });
+        }
+        if (targetUserId && targetUserId !== 'assistant_epibot') {
+          io.to(targetUserId).emit('conversation_cleared', { conversationId, userId: sender, targetUserId });
+        }
+        if (typeof callback === 'function') callback({ success: true, conversationId });
+      }
+    );
+
     // Enviar solicitud de amistad en tiempo real
     socket.on('send_friend_request', ({ targetUserId }: { targetUserId: string }) => {
       if (!currentUserId || currentUserId === targetUserId) return;

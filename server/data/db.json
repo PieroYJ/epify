@@ -19,7 +19,7 @@
       "name": "Alex",
       "avatar": "🧒",
       "pin": "1234",
-      "status": "offline",
+      "status": "online",
       "statusMessage": "¡Listo para jugar y chatear! 🎮",
       "badge": "Explorador 🌟",
       "createdAt": "2026-01-10T10:00:00Z",
@@ -170,60 +170,12 @@
   ],
   "messages": [
     {
-      "id": "msg_1",
-      "conversationId": "conv_alex_mateo",
-      "senderId": "user_mateo",
-      "content": "¡Hola Alex! 👋 ¿Viste el cohete que despegó ayer?",
-      "createdAt": "2026-03-02T10:15:00Z",
-      "status": "read"
-    },
-    {
-      "id": "msg_2",
-      "conversationId": "conv_alex_mateo",
-      "senderId": "user_alex",
-      "content": "¡Sí Mateo! Estuvo genial 🚀 ¿Jugamos más tarde?",
-      "createdAt": "2026-03-02T10:17:00Z",
-      "status": "read"
-    },
-    {
       "id": "msg_epi_welcome",
       "conversationId": "conv_epibot",
       "senderId": "assistant_epibot",
       "content": "¡Hola! Soy Epibot 🧸✨ Tu asistente inteligente y seguro. Puedes preguntarme adivinanzas, chistes sanos o curiosidades.",
       "createdAt": "2026-01-10T10:00:00Z",
       "status": "read"
-    },
-    {
-      "id": "msg_1790031143215_7cd7",
-      "conversationId": "conv_alex_mateo",
-      "senderId": "user_alex",
-      "content": "¡Hola Mateo! Mensaje en vivo.",
-      "createdAt": "2026-09-21T22:52:23.215Z",
-      "status": "sent"
-    },
-    {
-      "id": "msg_1790031145223_goxc",
-      "conversationId": "conv_alex_mateo",
-      "senderId": "user_mateo",
-      "content": "¡Hola Alex! Te respondo yo mismo.",
-      "createdAt": "2026-09-21T22:52:25.223Z",
-      "status": "sent"
-    },
-    {
-      "id": "msg_1790031312332_o915",
-      "conversationId": "conv_alex_mateo",
-      "senderId": "user_alex",
-      "content": "hola",
-      "createdAt": "2026-09-21T22:55:12.332Z",
-      "status": "sent"
-    },
-    {
-      "id": "msg_1790031322621_0nns",
-      "conversationId": "conv_alex_mateo",
-      "senderId": "user_alex",
-      "content": "q haces",
-      "createdAt": "2026-09-21T22:55:22.621Z",
-      "status": "sent"
     },
     {
       "id": "msg_1790039975808_ry65",
@@ -262,21 +214,12 @@
       "status": "sent"
     },
     {
-      "id": "msg_1790039992803_d9j5",
-      "conversationId": "conv_1790039992802_208h",
-      "senderId": "user_mateo",
-      "receiverId": "assistant_epibot",
-      "content": "Hola Epibot soy Mateo por primera vez",
-      "createdAt": "2026-09-22T01:19:52.803Z",
-      "status": "sent"
-    },
-    {
-      "id": "msg_1790039993603_hg7y",
+      "id": "msg_1790043890197_fbfz",
       "conversationId": "conv_1790039992802_208h",
       "senderId": "assistant_epibot",
       "receiverId": "user_mateo",
-      "content": "¡Hola Mateo! 🧸✨ ¿Quieres que te cuente un chiste, una adivinanza o una curiosidad?",
-      "createdAt": "2026-09-22T01:19:53.603Z",
+      "content": "¡Qué buen mensaje! 🌟 Puedes pedirme: \"cuéntame un chiste\" 😂 o \"dame una adivinanza\" 🧩.",
+      "createdAt": "2026-09-22T02:24:50.197Z",
       "status": "sent"
     }
   ],

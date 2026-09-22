@@ -204,3 +204,41 @@ export async function sendMessageApi(
   }
 }
 
+export async function deleteMessageApi(
+  messageId: string,
+  userId?: string,
+  targetUserId?: string,
+  conversationId?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, targetUserId, conversationId }),
+    });
+    const data = await res.json();
+    return data;
+  } catch {
+    return { success: false, error: 'Error al eliminar mensaje vía API' };
+  }
+}
+
+export async function clearChatApi(
+  conversationId: string,
+  userId?: string,
+  targetUserId?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, targetUserId }),
+    });
+    const data = await res.json();
+    return data;
+  } catch {
+    return { success: false, error: 'Error al limpiar conversación vía API' };
+  }
+}
+
+

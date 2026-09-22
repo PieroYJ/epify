@@ -89,6 +89,20 @@
       touch-action: none;
     }
 
+    /* Google PAC-MAN 2010 Doodle elements must use content-box so dimensions are not collapsed */
+    #board-scaler,
+    #board-scaler *,
+    #lga,
+    #lga *,
+    #logo,
+    #logo *,
+    #pcm-c,
+    #pcm-c *,
+    #pcm-p,
+    #pcm-p * {
+      box-sizing: content-box !important;
+    }
+
     #board-scaler {
       transform-origin: center center;
       transition: transform 0.15s ease;
@@ -304,15 +318,20 @@
       var scaler = document.getElementById('board-scaler');
       if (!frame || !scaler) return;
 
-      var frameWidth = frame.clientWidth;
+      var frameWidth = frame.clientWidth || frame.offsetWidth || 554;
       var boardWidth = 554;
       var boardHeight = 186;
 
       var scale = Math.min(1, (frameWidth - 8) / boardWidth);
       scaler.style.transform = 'scale(' + scale + ')';
+      scaler.style.webkitTransform = 'scale(' + scale + ')';
       frame.style.height = Math.round(boardHeight * scale + 14) + 'px';
     }
 
+    updateGameScale();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', updateGameScale);
+    }
     window.addEventListener('resize', updateGameScale);
     window.addEventListener('load', updateGameScale);
 

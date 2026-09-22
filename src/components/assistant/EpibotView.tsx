@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, ShieldCheck } from 'lucide-react';
+import { Send, Sparkles, ShieldCheck, Trash2 } from 'lucide-react';
 import { useEpify } from '../../context/EpifyContext';
 
 export const EpibotView: React.FC = () => {
-  const { currentUser, getConversationWith, sendMessage } = useEpify();
+  const { currentUser, getConversationWith, sendMessage, deleteMessage, clearChat } = useEpify();
   const [inputContent, setInputContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +86,34 @@ export const EpibotView: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={() => {
+              if (window.confirm('¿Quieres limpiar y borrar todos los mensajes de tu chat con Epibot?')) {
+                clearChat('assistant_epibot');
+              }
+            }}
+            title="Limpiar conversación con Epibot"
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              color: '#FFFFFF',
+              padding: '6px 10px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)')}
+          >
+            <Trash2 size={14} />
+            <span>Limpiar chat</span>
+          </button>
           <Sparkles size={18} color="#FFD93D" />
         </div>
       </div>
@@ -143,25 +170,56 @@ export const EpibotView: React.FC = () => {
                   🧸
                 </div>
               )}
-              <div>
-                <div
-                  className="chat-bubble"
-                  style={
-                    !isOutgoing
-                      ? {
-                          background: '#FFFFFF',
-                          border: '1.5px solid #EBD4FC',
-                          boxShadow: '0 4px 12px rgba(157, 78, 221, 0.08)',
+                <div style={{ maxWidth: '82%' }}>
+                  <div
+                    className="chat-bubble"
+                    style={
+                      !isOutgoing
+                        ? {
+                            background: '#FFFFFF',
+                            border: '1.5px solid #EBD4FC',
+                            boxShadow: '0 4px 12px rgba(157, 78, 221, 0.08)',
+                          }
+                        : {}
+                    }
+                  >
+                    {msg.content}
+                  </div>
+                  <div
+                    className="chat-bubble-time"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: isOutgoing ? 'flex-end' : 'flex-start',
+                      gap: 6,
+                    }}
+                  >
+                    <span>{timeStr}</span>
+                    <button
+                      onClick={() => {
+                        if (window.confirm('¿Deseas borrar este mensaje?')) {
+                          deleteMessage(msg.id, 'assistant_epibot');
                         }
-                      : {}
-                  }
-                >
-                  {msg.content}
+                      }}
+                      title="Eliminar mensaje"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '1px 3px',
+                        color: 'var(--text-muted)',
+                        borderRadius: 4,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        opacity: 0.6,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
-                <div className="chat-bubble-time">
-                  <span>{timeStr}</span>
-                </div>
-              </div>
             </div>
           );
         })}

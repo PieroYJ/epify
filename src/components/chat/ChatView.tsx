@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Smile,
   Shield,
+  Trash2,
 } from 'lucide-react';
 import { useEpify } from '../../context/EpifyContext';
 import { ReportModal } from '../common/ReportModal';
@@ -25,6 +26,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onBack }) => {
     isBlocked,
     getConversationWith,
     sendMessage,
+    deleteMessage,
+    clearChat,
     closeChat,
   } = useEpify();
 
@@ -224,79 +227,117 @@ export const ChatView: React.FC<ChatViewProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Menú de seguridad (no necesario para Epibot) */}
-        {!isEpibot && (
-          <div style={{ position: 'relative' }}>
-            <button
-              className="btn-icon-subtle"
-              onClick={() => setShowMenu(!showMenu)}
-              title="Opciones de seguridad"
-            >
-              <MoreVertical size={18} />
-            </button>
+        {/* Menú de opciones y seguridad */}
+        <div style={{ position: 'relative' }}>
+          <button
+            className="btn-icon-subtle"
+            onClick={() => setShowMenu(!showMenu)}
+            title="Opciones del chat"
+          >
+            <MoreVertical size={18} />
+          </button>
 
-            {showMenu && (
-              <div
+          {showMenu && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: '100%',
+                background: '#FFFFFF',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-md)',
+                zIndex: 30,
+                minWidth: 175,
+                padding: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+              }}
+            >
+              <button
                 style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '100%',
-                  background: '#FFFFFF',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  zIndex: 30,
-                  minWidth: 160,
-                  padding: 6,
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 10px',
+                  fontSize: '0.82rem',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--text-secondary)',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
+                  alignItems: 'center',
+                  gap: 8,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  setShowMenu(false);
+                  if (
+                    window.confirm(
+                      `¿Estás seguro de que deseas limpiar todos los mensajes de esta conversación con ${targetUser.name}?`
+                    )
+                  ) {
+                    clearChat(targetUser.id);
+                  }
                 }}
               >
-                <button
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '8px 10px',
-                    fontSize: '0.82rem',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--text-secondary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onClick={() => {
-                    setShowMenu(false);
-                    setShowReportModal(true);
-                  }}
-                >
-                  <AlertTriangle size={15} color="var(--primary)" />
-                  Reportar chat
-                </button>
-                <button
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '8px 10px',
-                    fontSize: '0.82rem',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--danger)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onClick={() => {
-                    setShowMenu(false);
-                    setShowBlockModal(true);
-                  }}
-                >
-                  <ShieldAlert size={15} color="var(--danger)" />
-                  Bloquear usuario
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+                <Trash2 size={15} color="var(--text-secondary)" />
+                Limpiar chat completo
+              </button>
+
+              {!isEpibot && (
+                <>
+                  <button
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 10px',
+                      fontSize: '0.82rem',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--text-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowReportModal(true);
+                    }}
+                  >
+                    <AlertTriangle size={15} color="var(--primary)" />
+                    Reportar chat
+                  </button>
+                  <button
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 10px',
+                      fontSize: '0.82rem',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--danger)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowBlockModal(true);
+                    }}
+                  >
+                    <ShieldAlert size={15} color="var(--danger)" />
+                    Bloquear usuario
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Banner de Seguridad para Niños */}
@@ -352,11 +393,42 @@ export const ChatView: React.FC<ChatViewProps> = ({ onBack }) => {
                     {targetUser.avatar}
                   </div>
                 )}
-                <div>
+                <div style={{ maxWidth: '82%' }}>
                   <div className="chat-bubble">{msg.content}</div>
-                  <div className="chat-bubble-time">
+                  <div
+                    className="chat-bubble-time"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: isOutgoing ? 'flex-end' : 'flex-start',
+                      gap: 6,
+                    }}
+                  >
                     <span>{timeStr}</span>
                     {isOutgoing && <span>✓✓</span>}
+                    <button
+                      onClick={() => {
+                        if (window.confirm('¿Deseas borrar este mensaje?')) {
+                          deleteMessage(msg.id, activeChatUserId || undefined);
+                        }
+                      }}
+                      title="Eliminar mensaje"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '1px 3px',
+                        color: 'var(--text-muted)',
+                        borderRadius: 4,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        opacity: 0.6,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 </div>
               </div>
