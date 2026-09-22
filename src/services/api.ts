@@ -185,3 +185,22 @@ export async function adminDeleteUserApi(
     return { success: false, error: 'No se pudo conectar con el servidor Epify' };
   }
 }
+
+export async function sendMessageApi(
+  senderId: string,
+  receiverId: string,
+  content: string
+): Promise<{ success: boolean; message?: Message; conversation?: Conversation; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senderId, receiverId, content }),
+    });
+    const data = await res.json();
+    return data;
+  } catch {
+    return { success: false, error: 'Error al enviar mensaje vía API' };
+  }
+}
+

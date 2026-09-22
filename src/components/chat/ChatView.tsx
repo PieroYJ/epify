@@ -28,8 +28,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onBack }) => {
     closeChat,
   } = useEpify();
 
-  if (!currentUser) return null;
-
   const [inputContent, setInputContent] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -60,6 +58,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onBack }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages.length]);
+
+  if (!currentUser) return null;
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();

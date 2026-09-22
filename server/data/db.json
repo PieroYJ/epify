@@ -6,7 +6,7 @@
       "name": "Administrador Epify",
       "avatar": "🛡️",
       "pin": "1234",
-      "status": "online",
+      "status": "offline",
       "statusMessage": "Panel de Control y Supervisión ⚙️",
       "badge": "Administrador 🛡️",
       "role": "admin",
@@ -159,6 +159,13 @@
       "participantB": "assistant_epibot",
       "createdAt": "2026-01-10T10:00:00Z",
       "isAiAssistant": true
+    },
+    {
+      "id": "conv_1790039992802_208h",
+      "participantA": "user_mateo",
+      "participantB": "assistant_epibot",
+      "createdAt": "2026-09-22T01:19:52.802Z",
+      "isAiAssistant": true
     }
   ],
   "messages": [
@@ -216,6 +223,60 @@
       "senderId": "user_alex",
       "content": "q haces",
       "createdAt": "2026-09-21T22:55:22.621Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790039975808_ry65",
+      "conversationId": "conv_epibot",
+      "senderId": "user_alex",
+      "receiverId": "assistant_epibot",
+      "content": "Hola Epibot desde HTTP",
+      "createdAt": "2026-09-22T01:19:35.808Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790039976138_3a4o",
+      "conversationId": "conv_epibot",
+      "senderId": "user_alex",
+      "receiverId": "assistant_epibot",
+      "content": "Cuéntame un chiste Epibot",
+      "createdAt": "2026-09-22T01:19:36.138Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790039976615_s5lz",
+      "conversationId": "conv_epibot",
+      "senderId": "assistant_epibot",
+      "receiverId": "user_alex",
+      "content": "¡Hola Alex! 🧸✨ ¿Quieres que te cuente un chiste, una adivinanza o una curiosidad?",
+      "createdAt": "2026-09-22T01:19:36.615Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790039976940_m4yd",
+      "conversationId": "conv_epibot",
+      "senderId": "assistant_epibot",
+      "receiverId": "user_alex",
+      "content": "¿Qué le dijo el mar a la playa? — ¡Hola olas! 🌊😊",
+      "createdAt": "2026-09-22T01:19:36.941Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790039992803_d9j5",
+      "conversationId": "conv_1790039992802_208h",
+      "senderId": "user_mateo",
+      "receiverId": "assistant_epibot",
+      "content": "Hola Epibot soy Mateo por primera vez",
+      "createdAt": "2026-09-22T01:19:52.803Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1790039993603_hg7y",
+      "conversationId": "conv_1790039992802_208h",
+      "senderId": "assistant_epibot",
+      "receiverId": "user_mateo",
+      "content": "¡Hola Mateo! 🧸✨ ¿Quieres que te cuente un chiste, una adivinanza o una curiosidad?",
+      "createdAt": "2026-09-22T01:19:53.603Z",
       "status": "sent"
     }
   ],

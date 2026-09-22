@@ -21,6 +21,7 @@ import {
   resetServerDataApi,
   adminCreateUserApi,
   adminDeleteUserApi,
+  sendMessageApi,
 } from '../services/api';
 import { connectSocket, disconnectSocket, getSocket } from '../services/socket';
 
@@ -184,26 +185,60 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       'message_received',
       ({
         message,
+        conversation,
         conversationId,
+        receiverId,
       }: {
         message: Message;
+        conversation?: Conversation;
         conversationId: string;
         receiverId: string;
       }) => {
         setMessages((prev) => {
+          // Si el mensaje real ya existe por id, no hacer nada
           if (prev.some((m) => m.id === message.id)) return prev;
+
+          // Reemplazar mensaje temporal optimista correspondiente
+          const tempIndex = prev.findIndex(
+            (m) =>
+              m.id.startsWith('temp_') &&
+              m.senderId === message.senderId &&
+              m.content === message.content
+          );
+
+          if (tempIndex >= 0) {
+            const updated = [...prev];
+            updated[tempIndex] = message;
+            return updated;
+          }
+
           return [...prev, message];
         });
 
-        // Asegurar que la conversación exista en el estado local
+        // Asegurar que la conversación exista y esté completa en el estado local
         setConversations((prev) => {
+          if (conversation) {
+            const idx = prev.findIndex((c) => c.id === conversation.id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = conversation;
+              return copy;
+            }
+            return [...prev, conversation];
+          }
+
           if (prev.some((c) => c.id === conversationId)) return prev;
+
+          // Fallback seguro si la conversación aún no existía en memoria
+          const otherParticipant =
+            message.senderId === currentUserId ? receiverId : message.senderId;
+
           return [
             ...prev,
             {
               id: conversationId,
-              participantA: message.senderId,
-              participantB: currentUserId,
+              participantA: currentUserId || message.senderId,
+              participantB: otherParticipant,
               createdAt: message.createdAt,
             },
           ];
@@ -544,20 +579,35 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     socket.emit('cancel_friend_request', { requestId });
   };
 
-  // Obtener mensajes de una conversación
+  // Obtener mensajes de una conversación de forma altamente resiliente
   const getConversationWith = (targetUserId: string): Message[] => {
     if (!currentUserId) return [];
+
+    // 1. Buscar conversación formal
     const conv = conversations.find(
       (c) =>
         (c.participantA === currentUserId && c.participantB === targetUserId) ||
         (c.participantA === targetUserId && c.participantB === currentUserId)
     );
-    if (!conv) return [];
-    return messages.filter((m) => m.conversationId === conv.id);
+
+    if (conv) {
+      return messages.filter(
+        (m) =>
+          m.conversationId === conv.id ||
+          (m.senderId === currentUserId && m.receiverId === targetUserId) ||
+          (m.senderId === targetUserId && (m.receiverId === currentUserId || !m.receiverId))
+      );
+    }
+
+    // 2. Fallback resiliente: buscar directamente por remitente y destinatario
+    return messages.filter(
+      (m) =>
+        (m.senderId === currentUserId && (m.receiverId === targetUserId || targetUserId === 'assistant_epibot')) ||
+        (m.senderId === targetUserId && (m.receiverId === currentUserId || !m.receiverId))
+    );
   };
 
-  // Enviar mensaje en tiempo real por WebSockets
-  // ¡CERO RESPUESTAS AUTOMÁTICAS PARA CUENTAS DE NIÑOS!
+  // Enviar mensaje en tiempo real por WebSockets con renderizado optimista y respaldo HTTP
   const sendMessage = (
     receiverId: string,
     content: string
@@ -575,8 +625,67 @@ export const EpifyProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
     }
 
+    // 1. Asegurar la conversación en memoria con los participantes correctos
+    let existingConv = conversations.find(
+      (c) =>
+        (c.participantA === currentUserId && c.participantB === receiverId) ||
+        (c.participantA === receiverId && c.participantB === currentUserId)
+    );
+
+    const convId = existingConv ? existingConv.id : `conv_${currentUserId}_${receiverId}`;
+    if (!existingConv) {
+      existingConv = {
+        id: convId,
+        participantA: currentUserId,
+        participantB: receiverId,
+        createdAt: new Date().toISOString(),
+        isAiAssistant: receiverId === 'assistant_epibot',
+      };
+      setConversations((prev) => [...prev, existingConv!]);
+    }
+
+    // 2. Renderizado optimista inmediato: el mensaje aparece en pantalla al instante (0ms lag)
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const optimisticMessage: Message = {
+      id: tempId,
+      conversationId: convId,
+      senderId: currentUserId,
+      receiverId,
+      content: cleanContent,
+      createdAt: new Date().toISOString(),
+      status: 'sent',
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+
+    // 3. Enviar vía WebSockets
     const socket = getSocket();
-    socket.emit('send_message', { receiverId, content: cleanContent });
+    if (socket.connected) {
+      socket.emit('send_message', { senderId: currentUserId, receiverId, content: cleanContent });
+    } else {
+      // Si el socket está reconectando o desconectado, forzar reconexión y respaldar vía HTTP
+      connectSocket(currentUserId);
+      sendMessageApi(currentUserId, receiverId, cleanContent).then((res) => {
+        if (res.success && res.message) {
+          setMessages((prev) => {
+            const exists = prev.some((m) => m.id === res.message!.id);
+            if (exists) return prev;
+            return prev.map((m) => (m.id === tempId ? res.message! : m));
+          });
+          if (res.conversation) {
+            setConversations((prev) => {
+              const idx = prev.findIndex((c) => c.id === res.conversation!.id);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = res.conversation!;
+                return copy;
+              }
+              return [...prev, res.conversation!];
+            });
+          }
+        }
+      });
+    }
 
     return { success: true };
   };

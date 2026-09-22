@@ -4,7 +4,6 @@ import { useEpify } from '../../context/EpifyContext';
 
 export const EpibotView: React.FC = () => {
   const { currentUser, getConversationWith, sendMessage } = useEpify();
-  if (!currentUser) return null;
   const [inputContent, setInputContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -17,6 +16,8 @@ export const EpibotView: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages.length]);
+
+  if (!currentUser) return null;
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();

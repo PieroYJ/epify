@@ -16,10 +16,10 @@ export const SearchFriendsView: React.FC = () => {
     setActiveTab,
   } = useEpify();
 
-  if (!currentUser) return null;
-
   const [searchQuery, setSearchQuery] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState<{ id: string; text: string } | null>(null);
+
+  if (!currentUser) return null;
 
   // Excluir al usuario actual de los resultados de búsqueda
   const candidateUsers = users.filter((u) => u.id !== currentUser.id);

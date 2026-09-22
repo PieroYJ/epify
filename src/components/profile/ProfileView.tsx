@@ -15,10 +15,10 @@ export const ProfileView: React.FC = () => {
     setActiveTab,
   } = useEpify();
 
-  if (!currentUser) return null;
-
-  const [statusMessageInput, setStatusMessageInput] = useState(currentUser.statusMessage || '');
+  const [statusMessageInput, setStatusMessageInput] = useState(currentUser?.statusMessage || '');
   const [showSavedMsg, setShowSavedMsg] = useState(false);
+
+  if (!currentUser) return null;
 
   const avatarChoices = ['🧒', '👧', '👦', '🧑‍🚀', '🎨', '🦖', '🎵', '⚽', '🦄', '🐼', '🚀', '🌟'];
 

@@ -35,6 +35,7 @@ export interface DBMessage {
   id: string;
   conversationId: string;
   senderId: string;
+  receiverId?: string;
   content: string;
   createdAt: string;
   status: 'sent' | 'delivered' | 'read';
@@ -471,12 +472,14 @@ class Database {
   public addMessage(
     conversationId: string,
     senderId: string,
-    content: string
+    content: string,
+    receiverId?: string
   ): DBMessage {
     const msg: DBMessage = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       conversationId,
       senderId,
+      receiverId,
       content,
       createdAt: new Date().toISOString(),
       status: 'sent',

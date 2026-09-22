@@ -26,6 +26,43 @@ const EPIBOT_RIDDLES = [
   '🧩 Tengo agujas pero no sé coser, tengo números pero no sé leer. ¿Qué soy? 👉 (¡El reloj! ⏰)',
 ];
 
+export function handleEpibotReply(
+  io: SocketIOServer,
+  conversation: any,
+  userId: string,
+  userMessage: string
+) {
+  setTimeout(() => {
+    let replyText = '';
+    const lower = userMessage.toLowerCase();
+
+    if (lower.includes('chiste')) {
+      replyText = EPIBOT_JOKES[Math.floor(Math.random() * EPIBOT_JOKES.length)];
+    } else if (lower.includes('adivinanza')) {
+      replyText = EPIBOT_RIDDLES[Math.floor(Math.random() * EPIBOT_RIDDLES.length)];
+    } else if (lower.includes('curiosidad') || lower.includes('planeta') || lower.includes('espacio') || lower.includes('estrella')) {
+      replyText = EPIBOT_TRIVIA[Math.floor(Math.random() * EPIBOT_TRIVIA.length)];
+    } else if (lower.includes('hola') || lower.includes('buenas')) {
+      const u = db.findUserById(userId);
+      replyText = `¡Hola ${u?.name || 'amigo'}! 🧸✨ ¿Quieres que te cuente un chiste, una adivinanza o una curiosidad?`;
+    } else if (lower.includes('seguridad') || lower.includes('consejo')) {
+      replyText = '🛡️ Consejo de seguridad: Nunca compartas contraseñas, tu dirección ni tu teléfono con nadie en internet.';
+    } else {
+      replyText =
+        '¡Qué buen mensaje! 🌟 Puedes pedirme: "cuéntame un chiste" 😂 o "dame una adivinanza" 🧩.';
+    }
+
+    const botMsg = db.addMessage(conversation.id, 'assistant_epibot', replyText, userId);
+
+    io.to(userId).emit('message_received', {
+      message: botMsg,
+      conversation,
+      conversationId: conversation.id,
+      receiverId: 'assistant_epibot',
+    });
+  }, 800);
+}
+
 export function setupSocketServer(io: SocketIOServer) {
   io.on('connection', (socket: Socket) => {
     let currentUserId: string | null = null;
@@ -33,6 +70,7 @@ export function setupSocketServer(io: SocketIOServer) {
     // Autenticación de socket
     socket.on('authenticate', ({ userId }: { userId: string }) => {
       currentUserId = userId;
+      socket.join(userId);
 
       if (!userSockets[userId]) {
         userSockets[userId] = new Set();
@@ -62,92 +100,77 @@ export function setupSocketServer(io: SocketIOServer) {
     // Enviar mensaje en tiempo real
     socket.on(
       'send_message',
-      ({ receiverId, content }: { receiverId: string; content: string }) => {
-        if (!currentUserId) {
+      (
+        { senderId, receiverId, content }: { senderId?: string; receiverId: string; content: string },
+        callback?: (res: any) => void
+      ) => {
+        const effectiveSenderId = currentUserId || senderId;
+        if (!effectiveSenderId) {
           socket.emit('error_message', { error: 'No autenticado' });
+          if (typeof callback === 'function') callback({ success: false, error: 'No autenticado' });
           return;
         }
 
+        // Si este socket aún no tenía el room asignado, vincularlo
+        if (!currentUserId) {
+          currentUserId = effectiveSenderId;
+          socket.join(effectiveSenderId);
+          if (!userSockets[effectiveSenderId]) userSockets[effectiveSenderId] = new Set();
+          userSockets[effectiveSenderId].add(socket.id);
+        }
+
         const cleanContent = content.trim();
-        if (!cleanContent) return;
+        if (!cleanContent) {
+          if (typeof callback === 'function') callback({ success: false, error: 'Mensaje vacío' });
+          return;
+        }
 
         // REGLA FUNDAMENTAL DE EPIFY:
         // Solo amigos aceptados pueden comunicarse (o el asistente Epibot)
         if (receiverId !== 'assistant_epibot') {
-          const areFriends = db.isFriend(currentUserId, receiverId);
+          const areFriends = db.isFriend(effectiveSenderId, receiverId);
           if (!areFriends) {
             socket.emit('error_message', {
               error: 'Regla de Epify: Solamente dos amigos aceptados pueden chatear.',
             });
+            if (typeof callback === 'function') callback({ success: false, error: 'No amigos' });
             return;
           }
 
-          if (db.isBlocked(currentUserId, receiverId)) {
+          if (db.isBlocked(effectiveSenderId, receiverId)) {
             socket.emit('error_message', { error: 'No puedes enviar mensajes a un usuario bloqueado.' });
+            if (typeof callback === 'function') callback({ success: false, error: 'Bloqueado' });
             return;
           }
         }
 
         // Crear o buscar conversación
-        const conversation = db.getOrCreateConversation(currentUserId, receiverId);
-        const newMsg = db.addMessage(conversation.id, currentUserId, cleanContent);
+        const conversation = db.getOrCreateConversation(effectiveSenderId, receiverId);
+        const newMsg = db.addMessage(conversation.id, effectiveSenderId, cleanContent, receiverId);
 
-        // Emitir mensaje al remitente (todas sus pestañas)
-        if (userSockets[currentUserId]) {
-          userSockets[currentUserId].forEach((sId) => {
-            io.to(sId).emit('message_received', {
-              message: newMsg,
-              conversationId: conversation.id,
-              receiverId,
-            });
+        // Emitir mensaje al remitente (todas sus pestañas / dispositivos)
+        io.to(effectiveSenderId).emit('message_received', {
+          message: newMsg,
+          conversation,
+          conversationId: conversation.id,
+          receiverId,
+        });
+
+        // Si el destinatario es un niño real, emitir a sus pestañas
+        if (receiverId !== 'assistant_epibot') {
+          io.to(receiverId).emit('message_received', {
+            message: newMsg,
+            conversation,
+            conversationId: conversation.id,
+            receiverId: effectiveSenderId,
           });
+        } else {
+          // Asistente Epibot
+          handleEpibotReply(io, conversation, effectiveSenderId, cleanContent);
         }
 
-        // Si el destinatario es un niño real:
-        // Se le envía el mensaje únicamente a sus pestañas/dispositivos conectados
-        // ¡CERO respuestas automáticas! Solo la persona real responderá.
-        if (receiverId !== 'assistant_epibot') {
-          if (userSockets[receiverId]) {
-            userSockets[receiverId].forEach((sId) => {
-              io.to(sId).emit('message_received', {
-                message: newMsg,
-                conversationId: conversation.id,
-                receiverId: currentUserId,
-              });
-            });
-          }
-        } else {
-          // Si el destinatario es Epibot (el asistente IA)
-          setTimeout(() => {
-            let replyText = '';
-            const lower = cleanContent.toLowerCase();
-
-            if (lower.includes('chiste')) {
-              replyText = EPIBOT_JOKES[Math.floor(Math.random() * EPIBOT_JOKES.length)];
-            } else if (lower.includes('adivinanza')) {
-              replyText = EPIBOT_RIDDLES[Math.floor(Math.random() * EPIBOT_RIDDLES.length)];
-            } else if (lower.includes('curiosidad')) {
-              replyText = EPIBOT_TRIVIA[Math.floor(Math.random() * EPIBOT_TRIVIA.length)];
-            } else if (lower.includes('hola') || lower.includes('buenas')) {
-              const u = db.findUserById(currentUserId!);
-              replyText = `¡Hola ${u?.name || 'amigo'}! 🧸✨ ¿Quieres que te cuente un chiste, una adivinanza o una curiosidad?`;
-            } else {
-              replyText =
-                '¡Qué buen mensaje! 🌟 Puedes pedirme: "cuéntame un chiste" 😂 o "dame una adivinanza" 🧩.';
-            }
-
-            const botMsg = db.addMessage(conversation.id, 'assistant_epibot', replyText);
-
-            if (userSockets[currentUserId!]) {
-              userSockets[currentUserId!].forEach((sId) => {
-                io.to(sId).emit('message_received', {
-                  message: botMsg,
-                  conversationId: conversation.id,
-                  receiverId: 'assistant_epibot',
-                });
-              });
-            }
-          }, 800);
+        if (typeof callback === 'function') {
+          callback({ success: true, message: newMsg, conversation });
         }
       }
     );
@@ -258,22 +281,14 @@ function notifyFriendshipAccepted(io: SocketIOServer, request: any) {
   const userB = db.findUserById(request.receiverId);
 
   // Notificar al sender
-  if (userSockets[request.senderId]) {
-    userSockets[request.senderId].forEach((sId) => {
-      io.to(sId).emit('friend_request_accepted', {
-        request,
-        newFriend: userB,
-      });
-    });
-  }
+  io.to(request.senderId).emit('friend_request_accepted', {
+    request,
+    newFriend: userB,
+  });
 
   // Notificar al receiver
-  if (userSockets[request.receiverId]) {
-    userSockets[request.receiverId].forEach((sId) => {
-      io.to(sId).emit('friend_request_accepted', {
-        request,
-        newFriend: userA,
-      });
-    });
-  }
+  io.to(request.receiverId).emit('friend_request_accepted', {
+    request,
+    newFriend: userA,
+  });
 }

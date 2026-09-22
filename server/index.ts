@@ -3,7 +3,7 @@ import http from 'http';
 import cors from 'cors';
 import { Server as SocketIOServer } from 'socket.io';
 import { db, DBUser } from './db';
-import { setupSocketServer } from './socket';
+import { setupSocketServer, handleEpibotReply } from './socket';
 
 const app = express();
 const server = http.createServer(app);
@@ -208,6 +208,51 @@ app.post('/api/user/status', (req, res) => {
   });
 
   return res.json({ success: true, user: sanitizeUser(updated) });
+});
+
+// 5b. Endpoint Enviar Mensaje (HTTP fallback y soporte para alta disponibilidad)
+app.post('/api/messages', (req, res) => {
+  const { senderId, receiverId, content } = req.body;
+  if (!senderId || !receiverId || !content?.trim()) {
+    return res.status(400).json({ error: 'senderId, receiverId y content son requeridos' });
+  }
+
+  const cleanContent = content.trim();
+
+  // Validación de seguridad para niños (solo amigos o Epibot)
+  if (receiverId !== 'assistant_epibot') {
+    const areFriends = db.isFriend(senderId, receiverId);
+    if (!areFriends) {
+      return res.status(403).json({ error: 'Regla de Epify: Solamente dos amigos aceptados pueden chatear.' });
+    }
+    if (db.isBlocked(senderId, receiverId)) {
+      return res.status(403).json({ error: 'No puedes enviar mensajes a un usuario bloqueado.' });
+    }
+  }
+
+  const conversation = db.getOrCreateConversation(senderId, receiverId);
+  const newMsg = db.addMessage(conversation.id, senderId, cleanContent, receiverId);
+
+  // Emitir por WebSocket para actualización instantánea a ambos usuarios
+  io.to(senderId).emit('message_received', {
+    message: newMsg,
+    conversation,
+    conversationId: conversation.id,
+    receiverId,
+  });
+
+  if (receiverId !== 'assistant_epibot') {
+    io.to(receiverId).emit('message_received', {
+      message: newMsg,
+      conversation,
+      conversationId: conversation.id,
+      receiverId: senderId,
+    });
+  } else {
+    handleEpibotReply(io, conversation, senderId, cleanContent);
+  }
+
+  return res.status(201).json({ success: true, message: newMsg, conversation });
 });
 
 // 6. Bloquear usuario
